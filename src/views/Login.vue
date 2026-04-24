@@ -136,46 +136,24 @@
                       v-on:keyup.enter="login"
                     ></v-text-field> -->
                     <v-layout>
-                      <v-flex grow>
-                        <v-text-field
-                          name="ip"
-                          label="IP Address"
-                          v-model="ip"
-                        ></v-text-field>
-                      </v-flex>
-                      <v-flex xs4 v-if="ds_direct">
-                        <v-text-field
-                          name="port"
-                          label="DS Port"
-                          v-model="port"
-                        ></v-text-field>
-                      </v-flex>
-                    </v-layout>
-                    <v-layout>
                       <v-flex xs12>
                         <v-text-field
-                          name="server_port"
-                          label="Server Port"
-                          v-model="server_port"
+                          name="server_url"
+                          label="Server URL"
+                          v-model="serverUrl"
                         ></v-text-field>
                       </v-flex>
                     </v-layout>
-                    <v-select
-                      disabled
-                      :items="items"
-                      label="Area"
+                    <v-text-field
+                      name="area"
+                      label="Area ID"
+                      type="number"
                       v-model="area"
-                      menu-props="auto"
-                    ></v-select>
+                    ></v-text-field>
                   </v-form>
                 </v-card-text>
                 <v-card-actions id="step2" class="pa-5" v-if="show">
                   <!-- <v-checkbox label="Administrator" v-model="checkbox"></v-checkbox> -->
-                  <v-checkbox
-                    label="Connect to DS"
-                    v-model="ds_direct"
-                    disabled
-                  ></v-checkbox>
                   <v-spacer></v-spacer>
                   <v-btn
                     large
@@ -323,7 +301,6 @@
 // import { Command } from "@tauri-apps/api/shell";
 // import { resourceDir, currentDir } from "@tauri-apps/api/path";
 import Spinner from "vue-spinkit";
-import { encode } from "@msgpack/msgpack";
 import VueDisplacementSlideshow from "vue-displacement-slideshow";
 // import { ipcRenderer } from "electron";
 
@@ -348,16 +325,14 @@ export default {
         password: "password",
       },
       showDash: false,
-      items: Object.keys(this.$store.state.casedetail.content.Area).concat([
-        "Not specified",
-      ]),
       checkbox: false,
-      area: 2, //null
+      area: 2,
       simID: "000",
       accessCode: null,
       ip: "localhost",
       port: "5557",
       server_port: "9990",
+      serverUrl: "http://localhost:8000",
       ds_direct: false,
       bg: null,
       bgId: 0,
@@ -385,27 +360,14 @@ export default {
       if (this.checkbox) {
         this.$store.commit("onAdmin");
       }
-      if (true) {
-        clearInterval(this.interval);
-        const config = {
-          direct: this.ds_direct,
-          ip: this.ip,
-          port: this.port,
-          server_port: this.server_port,
-        };
-        this.$store.commit("setLoginInfo", config);
-        this.$store.commit("setArea", this.area);
-        this.$store.commit("setSimID", "S" + this.simID);
-        this.$store.commit("setUsername", this.model.username);
-        this.loading = true;
-        setTimeout(() => {
-          this.showDash = true;
-          // this.$router.push('/dashboard');
-        }, 1000);
-        setTimeout(() => {
-          this.$store.state.socket.emit("register", this.model.username);
-        }, 2000);
-      }
+      clearInterval(this.interval);
+      this.$store.commit("setServerUrl", this.serverUrl);
+      this.$store.commit("setArea", this.area);
+      this.$store.commit("setUsername", this.model.username);
+      this.loading = true;
+      setTimeout(() => {
+        this.showDash = true;
+      }, 1000);
     },
     loaded(el) {
       this.counter++;

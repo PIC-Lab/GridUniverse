@@ -256,7 +256,7 @@
 							<v-list-item-title>pause</v-list-item-title>
 						</v-list-item-content>
           </v-list-item>-->
-          <v-list-item :key="'abort'" @click="$store.commit('trigabortsim')">
+          <v-list-item :key="'abort'" @click="abortSimulation">
             <!-- <v-list-item :key="'start'" @click="startDialog=true"> -->
             <v-list-item-avatar>
               <v-icon>close</v-icon>
@@ -319,8 +319,7 @@
 
       <!-- <router-view/> -->
     </v-main>
-    <MqttClient></MqttClient>
-    <DataProcessing></DataProcessing>
+    <ConnectionManager></ConnectionManager>
     <!-- <CostBot></CostBot> -->
     <AGCBot></AGCBot>
     <chatpop v-if="dialog" :visible="dialog" @close="dialog = false"></chatpop>
@@ -352,9 +351,8 @@
 // import generationPie from "../views/generation-pie-view";
 // import sysInfo from "../views/system-info-view";
 // import chatpop from './components/chatpop';
-import MqttClient from "./MqttClient";
+import ConnectionManager from "./ConnectionManager";
 import Util from "../util";
-import DataProcessing from "./DataProcessing";
 // import CostBot from './CostBot';
 import AGCBot from "./AGCBot";
 import marquee from "./marquee";
@@ -391,7 +389,7 @@ export default {
     chatpop: () => import("./chatpop"),
     startpop: () => import("./startpop"),
     reportpop: () => import("./reportpop"),
-    MqttClient,
+    ConnectionManager,
     Home: () => import("../views/Home"),
     // IkView: () => import("../views/Ik-view"),
     generator: () => import("../views/generator-view.vue"),
@@ -414,12 +412,19 @@ export default {
     generationVis: () => import("../views/generation-bar-view.vue"),
     generationPie: () => import("../views/generation-pie-view.vue"),
     sysInfo: () => import("../views/system-info-view.vue"),
-    DataProcessing,
     contact,
   },
   methods: {
     handleFullScreen() {
       Util.toggleFullScreen();
+    },
+    async abortSimulation() {
+      try {
+        const { simApi } = await import("../services/api");
+        await simApi.abort();
+      } catch (e) {
+        console.error("Failed to abort:", e);
+      }
     },
     changeHeight(e) {
       this.showToolbar = false;
