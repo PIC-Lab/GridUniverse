@@ -76,13 +76,13 @@
                 <v-flex xs6 white--text>
                   <div class="align-center text-sm-center card-orange">
                     <div class="title pt-4">Total Generation</div>
-                    <span class="title" style="color:white">{{ areaData[0] }}MW</span>
+                    <span class="title" style="color:white">{{ areaData ? areaData.gen_mw : 0 }}MW</span>
                   </div>
                 </v-flex>
                 <v-flex xs6 white--text>
                   <div class="align-center text-sm-center card-pink">
                     <div class="title pt-4">Total Load</div>
-                    <span class="title" style="color:white">{{ areaData[2] }}MW</span>
+                    <span class="title" style="color:white">{{ areaData ? areaData.load_mw : 0 }}MW</span>
                   </div>
                 </v-flex>
               </v-layout>
@@ -113,7 +113,7 @@
             <v-flex lg12 sm12 xs12>
               <v-widget title="Area Generation Overview" content-bg="dark">
                 <div slot="widget-content">
-                  <pie :areatotal="areaData[0]"></pie>
+                  <pie :areatotal="areaData ? areaData.gen_mw : 0"></pie>
                 </div>
               </v-widget>
             </v-flex>
@@ -186,7 +186,7 @@ import Material from "vuetify/es5/util/colors";
 import MapWidget from "@/components/MapWidget";
 import pie from "@/components/pie";
 import userInfo from "@/components/userInfo";
-import { mapState } from "vuex";
+import { mapGetters, mapState } from "vuex";
 
 export default {
   name: "generator",
@@ -197,9 +197,6 @@ export default {
     };
   },
   components: {
-    // HelloWorld,
-    // ApiClient,
-    // mapchart,
     gentable,
     VWidget,
     chartStatistic,
@@ -210,13 +207,24 @@ export default {
     userInfo
   },
   computed: {
-    ...mapState(["totalCost", "ACE", "areaData", "unitTimeCost", "schedule"])
+    ...mapGetters(["getTotalCost", "getAreaData", "getCurrentTime"]),
+    ...mapState(["schedule"]),
+    totalCost() { return this.getTotalCost; },
+    areaData() { return this.getAreaData; },
+    ACE() {
+      const area = this.getAreaData;
+      return area ? (area.ace || 0) : 0;
+    },
+    unitTimeCost() {
+      const area = this.getAreaData;
+      return area ? (area.total_cost || 0) : 0;
+    },
   },
   watch: {
     radios: function(newVal, oldVal) {
       this.$store.commit("setSchedule", newVal);
       this.$store.commit("addReportUser", {
-        time: this.$store.state.currentTime,
+        time: this.getCurrentTime,
         event: ["Schedule", newVal]
       });
     }

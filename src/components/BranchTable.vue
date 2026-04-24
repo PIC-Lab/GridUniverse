@@ -30,9 +30,7 @@
             ></v-switch>
           </template>
           <template slot="headerCell" slot-scope="props">
-            <!-- <v-tooltip bottom> -->
             <span slot="activator">{{ props.header.text }}</span>
-            <!-- </v-tooltip> -->
           </template>
           <template v-slot:items="props">
             <tr :active="props.selected" @click="props.selected = !props.selected">
@@ -48,11 +46,6 @@
               <td class="text-xs-right">{{ props.item.MVALimit }}</td>
             </tr>
           </template>
-          <!-- <template slot="expand" slot-scope="props">
-				<v-card flat>
-					<v-card-text>Peek-a-boo!</v-card-text>
-				</v-card>
-          </template>-->
         </v-data-table>
       </template>
       <v-divider></v-divider>
@@ -80,7 +73,7 @@ table.v-table thead th:not(:first-child) {
 }
 
 .fixed-header th {
-  background-color: rgba(255, 255, 255, 0); /* just for LIGHT THEME, change it to #474747 for DARK */
+  background-color: rgba(255, 255, 255, 0);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -103,6 +96,8 @@ table.v-table thead th:not(:first-child) {
 </style>
 
 <script>
+import { mapGetters } from "vuex";
+
 export default {
   props: {
     title: String
@@ -110,13 +105,7 @@ export default {
   data() {
     return {
       headers: [
-        {
-          text: "Branch",
-          align: "left",
-          // sortable: false,
-          value: "name",
-          width: "15%"
-        },
+        { text: "Branch", align: "left", value: "name", width: "15%" },
         { text: "Status", value: "Status" },
         { text: "MWFrom", value: "MWFrom" },
         { text: "MvarFrom", value: "MvarFrom" },
@@ -125,177 +114,68 @@ export default {
         { text: "MVA Limit", value: "MVALimit" },
         { text: "Actions", value: "Actions", sortable: false }
       ],
-      branches: [],
       selected: [],
-      anchor: 0,
-      branchDataLength: 0,
       defaultRowItems: [
         15,
         30,
         { text: "$vuetify.dataIterator.rowsPerPageAll", value: -1 }
       ],
-      branchArray: this.$store.state.areaHelper.Branch.list,
-      Interval: null
     };
   },
   methods: {
-    preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]['Field'].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        if (ele != "Branch") {
-          anchor += arrlength * keyarr.length;
+    async toggle(item) {
+      try {
+        const { deviceApi } = await import("@/services/api");
+        if (item.vStatus) {
+          await deviceApi.closeBranch(item.key);
         } else {
-          break;
+          await deviceApi.openBranch(item.key);
         }
-      }
-      this.anchor = anchor;
-      this.branchDataLength = arrlength;
-    },
-    initTable() {
-      let temp = [];
-      this.anchor = this.$store.state.areaHelper.Branch.anchor;
-      this.branchDataLength = this.$store.state.areaHelper.Branch.length;
-      // let subID;
-      for (let i in this.$store.state.areadetail.content.Branch) {
-        if (
-          [
-            this.$store.state.areadetail.content.Branch[i]["FromArea"],
-            this.$store.state.areadetail.content.Branch[i]["ToArea"]
-          ].includes(+this.$store.state.area)
-        ) {
-          temp.push({
-            value: false, //[this.$store.state.areadetail.content.Substation[subID.toString()]["Double.Longitude"], this.$store.state.areadetail.content.Substation[subID.toString()]["Double.Latitude"]],
-            key: i,
-            name:
-              this.$store.state.casedetail.content.Bus[i.split(",")[0]][
-                "String.Name"
-              ] +
-              "-" +
-              this.$store.state.casedetail.content.Bus[i.split(",")[1]][
-                "String.Name"
-              ] + " " + this.$store.state.areadetail.content.Branch[i]["String.CircuitID"],
-            id: this.$store.state.areadetail.content.Branch[i][
-              "String.CircuitID"
-            ],
-            Status: 1,
-            vStatus: 1,
-            MWFrom: 0,
-            MvarFrom: 0,
-            MVAFrom: 0,
-            AmpsFrom: 0,
-            MWTo: 0,
-            MvarTo: 0,
-            MVATo: 0,
-            AmpsTo: 0,
-            MVALimit: this.$store.state.areadetail.content.Branch[i][
-              "Single.MVA Limit"
-            ]
-          });
-        }
-      }
-      this.branches = temp;
-      if (this.branches.length > 1) {
-        return Promise.resolve("Table initialized properly");
-      } else {
-        return Promise.reject("Error in initialization");
+      } catch (e) {
+        console.error("Failed to toggle branch:", e);
       }
     },
-    updateTable() {
-      this.Interval = setInterval(() => {
-        try {
-          for (let i in this.branches) {
-            this.branches[i].Status = this.$store.state.branchData[
-              0 + i * this.branchDataLength
-            ];
-            this.branches[i].MWFrom = this.$store.state.branchData[
-              1 + i * this.branchDataLength
-            ]; // MW is the 6th in the load data
-            this.branches[i].MvarFrom = this.$store.state.branchData[
-              2 + i * this.branchDataLength
-            ];
-            this.branches[i].MVAFrom = this.$store.state.branchData[
-              3 + i * this.branchDataLength
-            ];
-            this.branches[i].AmpsFrom = this.$store.state.branchData[
-              4 + i * this.branchDataLength
-            ];
-            this.branches[i].MWTo = this.$store.state.branchData[
-              5 + i * this.branchDataLength
-            ]; // MW is the 6th in the load data
-            this.branches[i].MvarTo = this.$store.state.branchData[
-              6 + i * this.branchDataLength
-            ];
-            this.branches[i].MVATo = this.$store.state.branchData[
-              7 + i * this.branchDataLength
-            ];
-            this.branches[i].AmpsTo = this.$store.state.branchData[
-              8 + i * this.branchDataLength
-            ];
-            if (
-              this.$store.state.genAction["Branch"][this.branches[i].key] !=
-              undefined
-            ) {
-              if (
-                this.$store.state.currentTime >=
-                Math.max(
-                  this.$store.state.genAction["Branch"][this.branches[i].key]
-                ) +
-                  3
-              ) {
-                this.branches[i].vStatus = this.branches[i].Status;
-              }
-            } else {
-              this.branches[i].vStatus = this.branches[i].Status;
-            }
-          }
-        } catch (e) {
-          console.log("The raw data are not ready");
-        }
-      }, 500);
-    },
-    toggle(item) {
-      var command;
-      if (item.vStatus) {
-        item.vStatus = 1;
-        command = "CLOSE BOTH";
-      } else {
-        item.vStatus = 0;
-        command = "OPEN BOTH";
-      }
-      // console.log(item);
-      this.$store.commit("setMessage", ["Branch", item.key, item.key, command]);
-      this.$store.commit("recordAction", ["Branch", item.key]);
-      this.$store.commit("setPublish");
-    }
   },
-  created() {
-    // this.preProcess();
-    // this.initTable();
-  },
-  mounted() {
-    this.initTable().then(() => this.updateTable());
+  computed: {
+    ...mapGetters(["getBranchData", "getCaseData", "getStatus"]),
+    branches() {
+      if (!this.getCaseData) return [];
+      const branches = this.getCaseData.content.Branch || {};
+      const buses = this.getCaseData.content.Bus || {};
+      const branchLive = {};
+      this.getBranchData.forEach(b => { branchLive[b.key] = b; });
+      return Object.entries(branches).map(([key, data]) => {
+        const live = branchLive[key] || {};
+        const fromBus = buses[key.split(",")[0]];
+        const toBus = buses[key.split(",")[1]];
+        return {
+          key,
+          name: (fromBus?.["String.Name"] || "") +
+            "-" +
+            (toBus?.["String.Name"] || "") +
+            " " + (data["String.CircuitID"] || ""),
+          Status: live.status != null ? live.status : 1,
+          vStatus: live.status != null ? live.status === 1 : 1,
+          MWFrom: live.mw_from || 0,
+          MvarFrom: live.mvar_from || 0,
+          MVAFrom: live.mva_from || 0,
+          AmpsFrom: live.amps_from || 0,
+          MWTo: live.mw_to || 0,
+          MvarTo: live.mvar_to || 0,
+          MVATo: live.mva_to || 0,
+          AmpsTo: live.amps_to || 0,
+          MVALimit: data["Single.MVA Limit"] || 0,
+        };
+      });
+    },
+    disable() {
+      return this.getStatus !== "running";
+    },
   },
   watch: {
-    selected: function(newval, oldval) {
+    selected: function(newval) {
       this.$store.commit("updateSelectedShunts", newval);
     }
   },
-  computed: {
-    disable() {
-      if (this.$store.state.status == "running") {
-        return false;
-      } else {
-        return true;
-      }
-    }
-  },
-  beforeDestroy() {
-    clearInterval(this.Interval);
-  }
 };
 </script>

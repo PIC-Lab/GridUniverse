@@ -18,7 +18,7 @@
             :name="'GenMW'"
             icon="fa fa-facebook"
             title="Total Generation (MW)"
-            :sub-title="areaData[0]"
+            :sub-title="areaData ? areaData.gen_mw : 0"
             color="rgba(63, 81, 181, 0.8)"
             :img="require('../assets/icons8-factory-64.png')"
             id="step5"
@@ -29,7 +29,7 @@
             :name="'LoadMW'"
             icon="fa fa-google"
             title="Total Load (MW)"
-            :sub-title="areaData[2]"
+            :sub-title="areaData ? areaData.load_mw : 0"
             color="rgba(244, 67, 54, 0.8)"
             :img="require('../assets/kitchen-set.png')"
           ></mini-statistic>
@@ -39,7 +39,7 @@
             :name="'Freq'"
             icon="fa fa-twitter"
             title="Average Frequency (Hz)"
-            :sub-title="areaData[6]"
+            :sub-title="areaData ? areaData.frequency : 60"
             color="rgba(3, 169, 244, 0.8)"
             :img="require('../assets/icons8-frequency-64.png')"
           ></mini-statistic>
@@ -49,7 +49,7 @@
             :name="'ExportMW'"
             icon="fa fa-instagram"
             title="Export Power (MW)"
-            :sub-title="areaData[5]"
+            :sub-title="areaData ? areaData.export_mw : 0"
             color="rgba(156, 39, 176, 0.8)"
             :img="require('../assets/export.png')"
           ></mini-statistic>
@@ -72,12 +72,12 @@
         <v-flex lg4 sm4 xs12>
           <v-layout row wrap>
             <!-- <v-flex lg12 sm12 xs12>
-							<chartStatistic id="TC" min="dataMin" max="dataMax" title="Total Cost" icon="attach_money" card-color="indigo" :chart-color="[color.indigo.lighten1]" :costData='$store.state.totalCost.toFixed(2)' type="line"></chartStatistic>
+							<chartStatistic id="TC" min="dataMin" max="dataMax" title="Total Cost" icon="attach_money" card-color="indigo" :chart-color="[color.indigo.lighten1]" :costData='(getTotalCost || 0).toFixed(2)' type="line"></chartStatistic>
 						</v-flex>
 						<v-flex lg12 sm12 xs12>
 							<v-widget title="Area Generation Overview" content-bg="white">
 								<div slot="widget-content">
-									<pie :areatotal="areaData[0]"></pie>
+									<pie :areatotal="areaData ? areaData.gen_mw : 0"></pie>
 								</div>
 							</v-widget>
             </v-flex>-->
@@ -631,41 +631,30 @@ export default {
       });
     },
     initUpdateLines() {
-      this.anchor = this.$store.state.areaHelper.Branch.anchor;
-      this.branchArrLength = this.$store.state.areaHelper.Branch.length;
-      this.dataLength =
-        Object.keys(this.$store.state.areadetail.content["Branch"]).length *
-        this.branchArrLength;
-      this.statusArray = Array(
-        this.$store.state.areaHelper.Branch.list.length
-      ).fill(1);
+      const branches = this.$store.state.caseData ? this.$store.state.caseData.content.Branch : {};
+      this.statusArray = Array(Object.keys(branches).length).fill(1);
     },
     updateLinesCycle: function () {
       this.Interval = setInterval(() => {
         // this.updateLines();
-        if (this.$store.state.status === "running") {
+        if (this.getStatus === "running") {
           this.updateLines();
         }
         // console.log(this.$store.state.totalCost);
       }, 1500);
     },
     updateLines() {
-      const branchData = this.$store.state.branchData;
-      // let branchIndex;
+      const simBranches = this.$store.state.simState ? this.$store.state.simState.branch : {};
       let statusTemp = [];
       let branchChanged = false;
-      let i = 0;
-      const branchArray = this.$store.state.areaHelper.Branch.list;
-      const branchArrLength = this.$store.state.areaHelper.Branch.length;
       var key;
       let fromID, toID, coords;
       for (let index in linedata) {
-        // statusTemp.push(branchData[i]);
-        statusTemp.push(branchData[index * branchArrLength]);
-        linedata[index].attributes.MVA =
-          branchData[index * branchArrLength + 3];
-        linedata[index].attributes.MVFrom =
-          branchData[index * branchArrLength + 1];
+        const live = simBranches[linedata[index].id] || {};
+        const status = live.status != null ? live.status : 1;
+        statusTemp.push(status);
+        linedata[index].attributes.MVA = live.mva_from || 0;
+        linedata[index].attributes.MVFrom = live.mvar_from || 0;
         // branchIndex = i / this.branchArrLength;
         fromID = linedata[index].id.split(",")[0];
         toID = linedata[index].id.split(",")[1];
@@ -673,25 +662,25 @@ export default {
           // console.log(this.linedata[index].attributes.MVA)
           linedata[index].coords = [
             [
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[fromID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[fromID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Latitude"],
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[fromID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[fromID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Longitude"],
             ],
             [
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[toID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[toID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Latitude"],
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[toID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[toID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Longitude"],
@@ -701,25 +690,25 @@ export default {
           // console.log('NO')
           linedata[index].coords = [
             [
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[toID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[toID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Latitude"],
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[toID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[toID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Longitude"],
             ],
             [
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[fromID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[fromID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Latitude"],
-              this.$store.state.casedetail.content.Substation[
-                this.$store.state.casedetail.content.Bus[fromID][
+              this.$store.state.caseData.content.Substation[
+                this.$store.state.caseData.content.Bus[fromID][
                   "Int.Sub Number"
                 ].toString()
               ]["Double.Longitude"],
@@ -730,24 +719,22 @@ export default {
         // {
         if (
           this.statusArray[index] == 1 &&
-          [0, 2, 3].includes(branchData[index * branchArrLength])
+          [0, 2, 3].includes(status)
         ) {
           // Branch opened
           this.updateLineOpen(index);
           branchChanged = true;
-          // } else if (branchData[index * branchArrLength] == 1) {
         } else if (
           [0, 2, 3].includes(this.statusArray[index]) &&
-          branchData[index * branchArrLength] == 1
+          status == 1
         ) {
           // Branch closed
           this.updateLineClose(index);
           branchChanged = true;
         }
         key = linedata[index].id;
-        // console.log(key);
         if (
-          branchData[index * branchArrLength + 3] >=
+          (live.mva_from || 0) >=
           0.85 * linedata[index].attributes.MVALimit
         ) {
           // this.highRiskLines[key] = val;
@@ -810,12 +797,12 @@ export default {
   created() {},
   mounted() {
     this.initUpdateLines();
-    this.getData();
     this.initdraw("main");
-    this.onDrawSub();
-    // // this.onDrawLines();
-    // this.updateLines();
     this.updateLinesCycle();
+    if (this.$store.state.subData.length > 0) {
+      this.getData();
+      this.onDrawSub();
+    }
     // if (this.$store.state.showTour) {
     //   var intro = introJs();
     //   intro.setOptions({
@@ -847,18 +834,17 @@ export default {
   // 	}
   // },
   computed: {
-    ...mapState(["areaData", "riskBranches"]),
-    ...mapGetters({
-      ViolatedLines: "getViolatedLines",
-    }),
+    ...mapGetters(["getAreaData", "getRiskBranches", "getSubData", "getLineData", "getBranchData", "getTransformerData"]),
+    areaData() { return this.getAreaData; },
+    riskBranches() { return this.getRiskBranches; },
   },
   watch: {
-    // ViolatedLines: function() {
-    // 	// console.log(this.$store.state.violatedLines);
-    // 	let temp = this.chart._echartsOptions;
-    // 	temp.series[3].data = this.$store.state.violatedLines;
-    // 	this.chart.setOption(temp);
-    // }
+    '$store.state.subData.length'(newLen) {
+      if (newLen > 0 && this.subdata.length === 0) {
+        this.getData();
+        this.onDrawSub();
+      }
+    },
   },
   components: {
     linepop: () => import("./linepop"),

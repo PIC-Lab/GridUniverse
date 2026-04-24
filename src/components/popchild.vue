@@ -67,31 +67,15 @@
   </v-card>
 </template>
 
-<style>
-/* .el-tabs__item {
-	color: #fff;
-} */
-</style>
-
 <script>
-import { mapGetters } from "vuex";
-
 export default {
   props: {
     name: {},
     detail: {},
-    subname: {
-      type: String,
-    },
-    data: {
-      default: function () {
-        return [];
-      },
-    },
+    subname: { type: String },
+    data: { default: () => [] },
     show: {},
-    busnum: {
-      type: Number,
-    },
+    busnum: { type: Number },
   },
   data() {
     return {
@@ -107,151 +91,139 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({
-      dataflag: "rawData",
-    }),
     tabs: function () {
-      const controllable = ["Gen", "Load", "Shunt"];
       let temp = ["Bus"];
-      for (let ele in this.$store.state.areadetail.content.Gen) {
-        // console.log(ele)
-        if (ele.includes(this.name.split(" ")[1])) {
-          temp.push("Gen " + ele.split(",")[1]);
-        }
+      const caseData = this.$store.state.caseData;
+      if (!caseData) return temp;
+      const busNum = this.name.split(" ")[1];
+      for (let ele in caseData.content.Gen || {}) {
+        if (ele.startsWith(busNum)) temp.push("Gen " + ele.split(",")[1]);
       }
-      for (let ele in this.$store.state.areadetail.content.Load) {
-        // console.log(ele)
-        if (ele.includes(this.name.split(" ")[1])) {
-          temp.push("Load " + ele.split(",")[1]);
-        }
+      for (let ele in caseData.content.Load || {}) {
+        if (ele.startsWith(busNum)) temp.push("Load " + ele.split(",")[1]);
       }
-      for (let ele in this.$store.state.areadetail.content.Shunt) {
-        // console.log(ele)
-        if (ele.includes(this.name.split(" ")[1])) {
-          temp.push("Shunt " + ele.split(",")[1]);
-        }
+      for (let ele in caseData.content.Shunt || {}) {
+        if (ele.startsWith(busNum)) temp.push("Shunt " + ele.split(",")[1]);
       }
-      // for (let ele in this.detail) {
-      // 	if (controllable.includes(ele)) {
-      // 		// console.log(this.name);
-      // 		temp.push(ele);
-      // 	}
-      // }
       return temp;
     },
     headers: function () {
-      return this.$store.state.fieldstore[
-        this.tabs[this.activeTab].split(" ")[0]
-      ]["Field"].map(function (key) {
-        return { text: key, value: key };
-      });
+      return [
+        { text: "Field", value: "field" },
+        { text: "Value", value: "value" },
+      ];
     },
   },
   methods: {
-    getInput(e) {
-      console.log(e);
-    },
     cmddetection(ele) {
-      if (this.showInput == true) {
-        if (ele != "OPEN" && ele != "CLOSE") {
-          this.InputDisabled = false;
-        } else {
-          this.value = null;
-          this.InputDisabled = true;
-        }
+      if (this.showInput) {
+        this.InputDisabled = !(ele !== "OPEN" && ele !== "CLOSE");
+        if (ele === "OPEN" || ele === "CLOSE") this.value = null;
       } else {
         this.value = null;
         this.InputDisabled = true;
       }
     },
-    getData() {
-      this.type = this.activeObj;
-      const temp = this.$store.state.parsedData;
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-      // console.log([this.type, this.id])
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        if (ele != this.type) {
-          anchor += arrlength * keyarr.length;
-        } else {
-          anchor += arrlength * keyarr.indexOf(this.id);
-          break;
+    async sendCommand(command) {
+      try {
+        const { deviceApi } = await import("@/services/api");
+        const key = this.id;
+        if (this.activeObj === "Gen") {
+          if (command === "OPEN") await deviceApi.openGen(key);
+          else if (command === "CLOSE") await deviceApi.closeGen(key);
+          else if (this.value != null) await deviceApi.setGenPower(key, parseFloat(this.value));
+        } else if (this.activeObj === "Load") {
+          if (command === "OPEN") await deviceApi.openLoad(key);
+          else if (command === "CLOSE") await deviceApi.closeLoad(key);
+          else if (this.value != null) await deviceApi.setLoadPower(key, parseFloat(this.value));
+        } else if (this.activeObj === "Shunt") {
+          if (command === "OPEN") await deviceApi.openShunt(key);
+          else if (command === "CLOSE") await deviceApi.closeShunt(key);
         }
-        // console.log(Object.keys(this.$store.state.fieldstore).indexOf(ele))
-        // console.log(Object.keys(this.$store.state.casedetail.content[ele]).length)
-        // console.log(this.$store.state.fieldstore[ele].length)
+      } catch (e) {
+        console.error("Device command failed:", e);
       }
-      const spdata = temp.slice(anchor, anchor + arrlength);
-      let container = {};
-      for (let e in spdata) {
-        // console.log(this.$store.state.fieldstore[this.type][e]['value'])
-        container[this.$store.state.fieldstore[this.type]["Field"][e]] =
-          +spdata[e];
+    },
+    getData() {
+      const caseData = this.$store.state.caseData;
+      const simState = this.$store.state.simState;
+      if (!caseData) return;
+
+      if (this.activeObj === "Bus") {
+        const bus = (caseData.content.Bus || {})[this.id];
+        const liveBus = simState && simState.bus ? simState.bus[this.id] : null;
+        if (bus) {
+          this.display = [
+            { field: "Name", value: bus["String.Name"] },
+            { field: "Voltage (p.u.)", value: liveBus ? liveBus.vpu : bus["Single.Nominal kV"] },
+            { field: "Angle (deg)", value: liveBus ? liveBus.vangle : 0 },
+            { field: "Nominal kV", value: bus["Single.Nominal kV"] },
+            { field: "Area", value: bus["Int.Area Number"] },
+          ];
+        }
+      } else {
+        const device = (caseData.content[this.activeObj] || {})[this.id];
+        if (!device) return;
+        const simDevices = simState ? simState[this.activeObj.toLowerCase()] || {} : {};
+        const live = simDevices[this.id] || {};
+        let rows = Object.entries(device)
+          .filter(([k]) => !k.startsWith("Int."))
+          .map(([k, v]) => ({ field: k, value: v }));
+        if (live) {
+          rows.push({ field: "MW (live)", value: live.mw || 0 });
+          rows.push({ field: "Mvar (live)", value: live.mvar || 0 });
+          rows.push({ field: "Status (live)", value: live.status != null ? live.status : 1 });
+        }
+        this.display = rows;
       }
-      this.display = [container];
+    },
+    buildDropdown() {
+      let temp = [];
+      if (this.activeObj === "Gen") {
+        this.showInput = true;
+        temp = [
+          { text: "OPEN", callback: () => this.sendCommand("OPEN") },
+          { text: "CLOSE", callback: () => this.sendCommand("CLOSE") },
+          { text: "Set Power xxx MW", callback: () => this.sendCommand("Set Power " + this.value + " MW") },
+        ];
+      } else if (this.activeObj === "Load") {
+        this.showInput = true;
+        temp = [
+          { text: "OPEN", callback: () => this.sendCommand("OPEN") },
+          { text: "CLOSE", callback: () => this.sendCommand("CLOSE") },
+          { text: "Set MW xxx", callback: () => this.sendCommand("Set MW " + this.value) },
+        ];
+      } else if (this.activeObj === "Shunt") {
+        this.showInput = false;
+        temp = [
+          { text: "OPEN", callback: () => this.sendCommand("OPEN") },
+          { text: "CLOSE", callback: () => this.sendCommand("CLOSE") },
+        ];
+      } else {
+        this.showInput = false;
+      }
+      this.dropdown = temp;
     },
   },
   watch: {
-    dataflag: function () {
-      if (this.show.split("-")[1] === this.name) {
-        this.getData();
-      }
-    },
-    activeTab(newValue, oldValue) {
+    activeTab(newValue) {
       let ele = this.tabs[newValue];
-      let temp = [];
       this.activeObj = ele;
-      if (this.activeObj == "Bus") {
+      if (this.activeObj === "Bus") {
         this.id = this.detail["Int.Bus Number"].toString();
       } else {
-        let key,
-          strArray = ele.split(" ");
-        if (strArray.length == 2) {
-          key = strArray[1];
-        } else {
-          key = strArray[1] + " " + strArray[2];
-        }
+        let strArray = ele.split(" ");
+        let key = strArray[1];
         this.id = this.name.split(" ")[1] + "," + key;
-        // this.id = this.detail[this.activeObj]["Int.Bus Number"]
       }
-      if (this.activeObj.includes("Gen")) {
-        this.activeObj = "Gen";
-        this.showInput = true;
-      } else if (this.activeObj.includes("Load")) {
-        this.activeObj = "Load";
-      } else if (this.activeObj.includes("Shunt")) {
-        this.activeObj = "Shunt";
-      }
-      for (var j in this.$store.state.tcmcommands[this.activeObj]) {
-        let jj = j;
-        temp.push({
-          text: this.$store.state.tcmcommands[this.activeObj][j],
-          callback: () => {
-            const temp =
-              this.$store.state.areadetail.content[this.activeObj][this.id];
-            var command = this.$store.state.tcmcommands[this.activeObj][jj];
-            if (!this.InputDisabled) {
-              if (this.value == null) {
-                this.value = 0;
-              }
-              command =
-                command.split("xxx")[0] + this.value + command.split("xxx")[1];
-            }
-            this.$store.commit("setMessage", [
-              this.activeObj,
-              temp["Int.Bus Number"].toString() + "," + temp["String.ID"],
-              this.subname + " " + this.name + " " + "#" + temp["String.ID"],
-              command,
-            ]);
-            this.$store.commit("setPublish");
-          },
-        });
-      }
-      this.dropdown = temp;
+      this.buildDropdown();
+      this.getData();
+    },
+    show: {
+      immediate: true,
+      handler(val) {
+        if (val && this.activeTab === 0) this.getData();
+      },
     },
   },
 };

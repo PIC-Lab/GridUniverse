@@ -49,16 +49,7 @@
 			</v-layout>
 		</v-container>
 	</div>
-
 </template>
-
-<style>
-/* .container {
-	max-width: 100vw;
-	padding: 0px;
-	margin: 5px;
-} */
-</style>
 
 <script>
 import branchtable from '@/components/BranchTable';
@@ -66,7 +57,7 @@ import bustable from '@/components/RiskBusTable';
 import VWidget from '@/components/VWidget';
 import MapWidget from '@/components/MapWidget';
 import userInfo from "@/components/userInfo";
-import { mapGetters, mapState } from 'vuex';
+import { mapGetters } from 'vuex';
 
 export default {
 	name: 'branch',
@@ -74,7 +65,7 @@ export default {
 		return {
 			min: 0,
 			max: 250,
-			slider: this.$store.state.slider,
+			slider: 150,
 			triggered: false,
 			GMDSwitch: false
 		}
@@ -87,31 +78,30 @@ export default {
 		userInfo
 	},
 	computed: {
-		...mapState(['lapse']),
-		...mapGetters({
-			timelapse: 'getLapse'
-		})
+		...mapGetters(['getCurrentTime']),
+		lapse() {
+			return this.getCurrentTime || 0;
+		},
 	},
 	watch: {
-		timelapse: function() {
-			if(this.$store.state.lapse < +this.slider && this.triggered) {
+		lapse: function() {
+			if(this.lapse < +this.slider && this.triggered) {
 				this.triggered = false;
 			};
-			if(this.$store.state.lapse >= +this.slider && !this.triggered && this.GMDSwitch) {
-				this.$store.commit('setMessage', [
-						'Branch',
-						'144,101,1',
-						'Johnsonville - Nashville',
-						'OPEN BOTH'
-					]);
-					this.$store.commit('setPublish');
+			if(this.lapse >= +this.slider && !this.triggered && this.GMDSwitch) {
+				this.triggerBranchOpen();
 				this.triggered = true;
 			};
-			// this.chart.setOption({series: [{
-			// 	id: 'vbus',
-			// 	name: 'vbus',
-			// 	data: this.$store.state.violatedBuses
-			// }]})
+		}
+	},
+	methods: {
+		async triggerBranchOpen() {
+			try {
+				const { deviceApi } = await import("@/services/api");
+				await deviceApi.openBranch("144,101,1");
+			} catch (e) {
+				console.error("GMD branch open failed:", e);
+			}
 		}
 	}
 };

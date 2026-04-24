@@ -138,7 +138,7 @@ export default {
         30,
         { text: "$vuetify.dataIterator.rowsPerPageAll", value: -1 },
       ],
-      TransformerArray: this.$store.state.areaHelper.Transformer.list,
+      TransformerArray: [],
       chart: {},
       subdata: [],
       linedata: [],
@@ -153,9 +153,7 @@ export default {
       transData: [],
       substationArray: [],
       substationFieldIndex: {
-        GICElectricFieldVKM: this.$store.state.fieldstore["Substation"][
-          "Field"
-        ].findIndex((x) => x === "GICElectricFieldVKM"),
+        GICElectricFieldVKM: 0, // TODO: GIC data from backend when available
       },
       contoursLayer: {},
       interval: {},
@@ -363,49 +361,19 @@ export default {
       // leafletMap.zoomControl.remove();
     },
     preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        console.log(ele);
-        if (ele != "Substation") {
-          anchor += arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
-      this.anchor = anchor;
-      this.substationDataLength = arrlength;
+      // No longer needed - data comes from caseData API
     },
     initTable() {
       let temp = [];
-      let subid;
-      // this.anchor = this.$store.state.areaHelper.Transformer.anchor;
-      // this.SubstationDataLength = this.$store.state.areaHelper.Transformer.length;
-      // let subID;
-      for (let i in this.$store.state.areadetail.content.Substation) {
-        if (
-          this.$store.state.areadetail.content.Substation[i][
-            "Int.Area Number"
-          ] == +this.$store.state.area
-        ) {
+      const caseData = this.$store.state.caseData;
+      if (!caseData) return;
+      const subs = caseData.content.Substation || {};
+      for (let i in subs) {
+        if (subs[i]["Int.Area Number"] == +this.$store.state.area) {
           temp.push({
-            value: [
-              this.$store.state.areadetail.content.Substation[i][
-                "Double.Longitude"
-              ],
-              this.$store.state.areadetail.content.Substation[i][
-                "Double.Latitude"
-              ],
-            ],
-            // key: i,
-            name: this.$store.state.areadetail.content.Substation[i][
-              "String.Name"
-            ],
-            GICElectricFieldVKM: 0, //0
+            value: [subs[i]["Double.Longitude"], subs[i]["Double.Latitude"]],
+            name: subs[i]["String.Name"],
+            GICElectricFieldVKM: 0,
           });
         }
       }
@@ -417,26 +385,8 @@ export default {
       }
     },
     updateTable() {
-      this.interval = setInterval(() => {
-        try {
-          if (this.$store.state.status === "running") {
-            const tempData = this.$store.state.parsedData;
-            // let temp = this.chart._echartsOptions;
-            for (let i in this.Substations) {
-              // console.log(tempData[this.anchor + this.substationFieldIndex['GICElectricFieldVKM'] - 1 + i * this.substationDataLength])
-              // console.log(tempData[this.anchor + this.substationFieldIndex['GICElectricFieldVKM'] + i * this.substationDataLength])
-              // temp.series[0].data[i]['GICElectricFieldVKM'] =
-              // 	tempData[
-              // 		this.anchor +
-              // 			this.substationFieldIndex['GICElectricFieldVKM'] +
-              // 			i * this.substationDataLength
-              // 	];
-              this.Substations[i]["GICElectricFieldVKM"] =
-                tempData[
-                  this.anchor +
-                    this.substationFieldIndex["GICElectricFieldVKM"] +
-                    i * this.substationDataLength
-                ].toFixed(2);
+      // TODO: Update GIC data from backend when available
+    },
             }
             // this.chart.setOption(temp);
             // var t0 = performance.now();
@@ -519,19 +469,23 @@ export default {
         command = "OPEN BOTH";
       }
       // console.log(item);
-      this.$store.commit("setMessage", [
-        "Transformers",
-        item.key,
-        item.key,
-        command,
-      ]);
-      this.$store.commit("recordAction", ["Transformers", item.key]);
-      this.$store.commit("setPublish");
+      this.toggleTransformer(item, command);
+    },
+    async toggleTransformer(item, command) {
+      try {
+        const { deviceApi } = await import("@/services/api");
+        if (command === "OPEN BOTH") {
+          await deviceApi.openBranch(item.key);
+        } else {
+          await deviceApi.closeBranch(item.key);
+        }
+      } catch (e) {
+        console.error("Transformer command failed:", e);
+      }
     },
   },
   created() {
     this.preProcess();
-    // this.initTable();
   },
   mounted() {
     this.initTable().then(() => this.updateTable());
@@ -539,7 +493,6 @@ export default {
   },
   beforeDestroy() {
     clearInterval(this.interval);
-    this.updateTable = () => {};
   },
   watch: {},
   computed: {},

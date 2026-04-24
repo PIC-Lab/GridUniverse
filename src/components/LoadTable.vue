@@ -48,11 +48,6 @@
               <td class="text-xs-center">{{ props.item.FreqHz }}</td>
             </tr>
           </template>
-          <!-- <template slot="expand" slot-scope="props">
-				<v-card flat>
-					<v-card-text>Peek-a-boo!</v-card-text>
-				</v-card>
-          </template>-->
         </v-data-table>
       </template>
       <v-divider></v-divider>
@@ -74,9 +69,7 @@ table.v-table thead th:not(:first-child) {
 </style>
 
 <script>
-import { mapState } from "vuex";
-
-// let loads = [];
+import { mapGetters } from "vuex";
 
 export default {
   props: {
@@ -85,177 +78,49 @@ export default {
   data() {
     return {
       headers: Object.freeze([
-        {
-          text: "Load",
-          align: "left",
-          // sortable: false,
-          value: "name",
-        },
+        { text: "Load", align: "left", value: "name" },
         { text: "Status", value: "Status" },
         { text: "MW", value: "MW" },
         { text: "Mvar", value: "Mvar" },
         { text: "Vpu", value: "Vpu" },
         { text: "FreqHz", value: "FreqHz" },
-        // { text: 'MVA', value: 'MVA' },
-        // { text: 'MW setpoint', value: 'MWSet', sortable: false },
-        // { text: 'Vpu setpoint', value: 'VpuSet', sortable: false },
         { text: "Actions", value: "Actions", sortable: false },
       ]),
       selected: [],
-      anchor: 0,
-      loadDataLength: 0,
       defaultRowItems: [
         15,
         30,
         { text: "$vuetify.dataIterator.rowsPerPageAll", value: -1 },
       ],
-      loadArray: [],
-      loads: [],
-      Interval: null,
     };
   },
   methods: {
-    preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.fieldstore) {
-        arrlength = this.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.areadetail.content[ele]);
-        if (ele != "Load") {
-          anchor += arrlength * keyarr.length;
+    async toggle(item) {
+      try {
+        const { deviceApi } = await import("@/services/api");
+        if (item.Status == 1) {
+          await deviceApi.openLoad(item.key_cmd);
         } else {
-          break;
+          await deviceApi.closeLoad(item.key_cmd);
         }
-      }
-      this.anchor = anchor;
-      this.loadDataLength = arrlength;
-    },
-    initTable() {
-      let temp = [];
-      let count = 0;
-      let subID;
-      for (let i in this.areadetail.content.Load) {
-        if (this.areadetail.content.Load[i]["Int.Area Number"] == +this.area) {
-          this.loadArray.push(count);
-          subID =
-            this.areadetail.content.Bus[i.split(",")[0]]["Int.Sub Number"];
-          temp.push({
-            value: [
-              this.areadetail.content.Substation[subID.toString()][
-                "Double.Latitude"
-              ],
-              this.areadetail.content.Substation[subID.toString()][
-                "Double.Longitude"
-              ],
-            ],
-            key_cmd: i,
-            name: Object.freeze(
-              this.areadetail.content.Bus[i.split(",")[0]]["String.Name"] +
-                " " +
-                this.areadetail.content.Load[i]["String.ID"]
-            ),
-            Status: 1,
-            vStatus: true,
-            MW: 0,
-            Mvar: 0,
-            Vpu: 1,
-            FreqHz: 60,
-            id_cmd: Object.freeze(this.areadetail.content.Load[i]["String.ID"]),
-          });
-        }
-        count++;
-      }
-      this.loads = temp;
-      if (this.loads.length > 1) {
-        return Promise.resolve("Table initialized properly");
-      } else {
-        return Promise.reject("Error in initialization");
+      } catch (e) {
+        console.error("Failed to toggle load:", e);
       }
     },
-    updateTable() {
-      this.Interval = setInterval(() => {
-        try {
-          const temp = this.parsedData;
-          for (let i in this.loads) {
-            this.loads[i].MW =
-              temp[this.anchor + 6 + this.loadArray[i] * this.loadDataLength]; // MW is the 6th in the load data
-            this.loads[i].Mvar =
-              temp[this.anchor + 7 + this.loadArray[i] * this.loadDataLength];
-            this.loads[i].Vpu =
-              temp[this.anchor + this.loadArray[i] * this.loadDataLength];
-            this.loads[i].FreqHz =
-              temp[this.anchor + 3 + this.loadArray[i] * this.loadDataLength];
-            this.loads[i].Status =
-              temp[this.anchor + 5 + this.loadArray[i] * this.loadDataLength];
-            if (this.genAction["Load"][this.loads[i].key_cmd] != undefined) {
-              if (
-                this.currentTime >=
-                Math.max(this.genAction["Load"][this.loads[i].key_cmd]) + 3
-              ) {
-                this.loads[i].vStatus =
-                  this.loads[i].Status == 1 ? true : false;
-              }
-            } else {
-              this.loads[i].vStatus = this.loads[i].Status == 1 ? true : false;
-            }
-          }
-        } catch (e) {
-          console.log("The raw data are not ready");
-        }
-      }, 500);
-    },
-    toggle(item) {
-      var command;
-      if (item.Status == 1) {
-        command = "OPEN";
-      } else {
-        command = "CLOSE";
-      }
-      this.$store.commit("setMessage", [
-        "Load",
-        item.key_cmd + "," + item.id_cmd,
-        item.key_cmd + "#" + item.id_cmd,
-        command,
-      ]);
-      this.$store.commit("recordAction", ["Load", item.key_cmd]);
-      this.$store.commit("setPublish");
-    },
-  },
-  created() {
-    this.loads = [];
-    this.preProcess();
-    // this.initTable();
-  },
-  mounted() {
-    this.initTable().then(() => this.updateTable());
   },
   computed: {
-    ...mapState([
-      "fieldstore",
-      "areadetail",
-      "area",
-      "parsedData",
-      "genAction",
-      "currentTime",
-      "status",
-    ]),
+    ...mapGetters(["getLoadData", "getStatus"]),
+    loads() {
+      return this.getLoadData;
+    },
     disable() {
-      if (this.status == "running") {
-        return false;
-      } else {
-        return true;
-      }
+      return this.getStatus !== "running";
     },
   },
   watch: {
-    selected: function (newval, oldval) {
+    selected: function (newval) {
       this.$store.commit("updateSelectedLoads", newval);
     },
-  },
-  beforeDestroy() {
-    clearInterval(this.Interval);
   },
 };
 </script>

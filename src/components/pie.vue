@@ -7,14 +7,11 @@
   height: 300px;
   width: 100%;
 }
-/* .echarts {
-	width: 100%;
-    height: 300px;
-} */
 </style>
 
 <script>
 import Material from "vuetify/es5/util/colors";
+import { mapGetters } from "vuex";
 import * as echarts from "echarts/core";
 import { PieChart } from "echarts/charts";
 import { TooltipComponent, LegendComponent } from "echarts/components";
@@ -22,7 +19,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import darkTheme from "../assets/dark.js";
 echarts.registerTheme('dark', darkTheme);
 
-echarts.use([, TooltipComponent, LegendComponent, PieChart, CanvasRenderer]);
+echarts.use([TooltipComponent, LegendComponent, PieChart, CanvasRenderer]);
 
 export default {
   props: {
@@ -31,30 +28,11 @@ export default {
   data() {
     return {
       chart: "",
-      anchor: 0,
-      genDataLength: 0,
       color: Material,
       Process: null,
     };
   },
   methods: {
-    preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        if (ele != "Gen") {
-          anchor += arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
-      this.anchor = anchor;
-      this.genDataLength = arrlength;
-    },
     initdraw() {
       this.chart = echarts.init(document.getElementById("pie"), "dark");
       this.chart.setOption({
@@ -79,53 +57,18 @@ export default {
               borderWidth: 1,
               borderRadius: 4,
               rich: {
-                a: {
-                  color: "#000",
-                  lineHeight: 22,
-                  align: "center",
-                },
-                abg: {
-                  backgroundColor: "#333",
-                  width: "100%",
-                  align: "right",
-                  height: 15,
-                  borderRadius: [0, 0, 4, 4],
-                },
-                hr: {
-                  borderColor: "#aaa",
-                  width: "100%",
-                  borderWidth: 0.5,
-                  height: 0,
-                },
-                b: {
-                  fontSize: 16,
-                  lineHeight: 33,
-                },
-                c: {
-                  color: "#999",
-                  lineHeight: 20,
-                  align: "center",
-                },
-                per: {
-                  color: "#eee",
-                  // backgroundColor: '#334455',
-                  // padding: [2, 4],
-                  // borderRadius: 2,
-                  align: "center",
-                  // width: '100%'
-                },
+                a: { color: "#000", lineHeight: 22, align: "center" },
+                abg: { backgroundColor: "#333", width: "100%", align: "right", height: 15, borderRadius: [0, 0, 4, 4] },
+                hr: { borderColor: "#aaa", width: "100%", borderWidth: 0.5, height: 0 },
+                b: { fontSize: 16, lineHeight: 33 },
+                c: { color: "#999", lineHeight: 20, align: "center" },
+                per: { color: "#eee", align: "center" },
               },
             },
-            labelLine: {
-              show: true,
-            },
-            data: [], //[],
+            labelLine: { show: true },
+            data: [],
             emphasis: {
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: "rgba(0, 0, 0, 0.5)",
-              },
+              itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0, 0, 0, 0.5)" },
             },
           },
         ],
@@ -133,22 +76,14 @@ export default {
     },
     updateData() {
       try {
+        const genStat = this.getGenStat || [0, 0];
         this.chart.setOption({
           series: {
             id: "pie",
             data: [
-              {
-                value: Math.round(this.areatotal),
-                name: "Current Generation",
-              },
-              {
-                value: this.$store.state.genStat[0],
-                name: "Online Capacity",
-              },
-              {
-                value: Math.round(this.$store.state.genStat[1]),
-                name: "Offline Capacity",
-              },
+              { value: Math.round(this.areatotal), name: "Current Generation" },
+              { value: genStat[0], name: "Online Capacity" },
+              { value: Math.round(genStat[1]), name: "Offline Capacity" },
             ],
           },
         });
@@ -164,12 +99,11 @@ export default {
       };
     },
   },
-  created() {
-    // this.$nextTick(()=> { this.initdraw(); })
+  computed: {
+    ...mapGetters(["getGenStat"]),
   },
   mounted() {
     this.initdraw();
-    this.preProcess();
     this.resizeChart();
     this.Process = setInterval(() => {
       this.updateData();

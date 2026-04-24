@@ -11,9 +11,6 @@
 							<v-flex xs12>
 								<v-text-field disabled label="Seconds to stop" v-model.lazy="time" required :rules="[rules.prohibited]" @keyup.enter="enterClicked"></v-text-field>
 							</v-flex>
-							<!-- <v-flex xs12>
-								<v-text-field label="Content" v-model.lazy="content" @keyup.enter="enterClicked"></v-text-field>
-							</v-flex> -->
 						</v-layout>
 					</v-container>
 				</v-card-text>
@@ -26,30 +23,28 @@
 	</v-layout>
 </template>
 
-<style>
-
-</style>
-
 <script>
+import { simApi } from "../services/api";
+
 export default {
 	props: {
 		visible: {
 			type: Boolean,
-			default: false
+			default: false,
 		},
 		topic: {
-			default: ''
-		}
+			default: "",
+		},
 	},
 	data() {
 		return {
-			content: '',
+			content: "",
 			time: null,
 			rules: {
-				prohibited: value =>
-					(value != 'data' && value != 'user' && value != 'note') ||
-					'Cannot use the reserved topic'
-			}
+				prohibited: (value) =>
+					(value != "data" && value != "user" && value != "note") ||
+					"Cannot use the reserved topic",
+			},
 		};
 	},
 	computed: {
@@ -61,27 +56,31 @@ export default {
 				if (!value) {
 					this.display = [];
 					this.childshow = false;
-					this.$emit('close');
+					this.$emit("close");
 				}
-			}
-		}
+			},
+		},
 	},
 	methods: {
-		activate() {
-			if(!this.time){
-				if(this.$store.state.status != 'paused'){
-					this.$store.commit('trigstartsim');
+		async activate() {
+			try {
+				if (!this.time) {
+					if (this.$store.state.simState?.status !== "paused") {
+						await simApi.start();
+					} else {
+						await simApi.continue();
+					}
 				} else {
-					this.$store.commit('trigcontinuesim');
+					await simApi.runTo(parseInt(this.time));
 				}
-			} else {
-				this.$store.commit('trigsimtoseconds', +this.time);
+			} catch (e) {
+				console.error("Failed to start simulation:", e);
 			}
 			this.show = false;
 		},
 		enterClicked() {
 			this.activate();
-		}
-	}
+		},
+	},
 };
 </script>

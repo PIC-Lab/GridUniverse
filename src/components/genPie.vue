@@ -4,7 +4,7 @@
     <!-- Creating the generation bar chart. -->
     <v-layout row wrap>
       <v-flex lg6 sm12 xs12>
-        <pieDistribute :areatotal="areaData[0]"></pieDistribute>
+        <pieDistribute :areatotal="areaGenMw"></pieDistribute>
       </v-flex>
       <v-flex lg6 sm12 xs12>
         <div id="genpie" class="genpie" />
@@ -22,9 +22,8 @@
 </style>
 
 <script>
-// Need to use the ECharts component.
 import pieDistribute from "@/components/pieDistribute";
-import { mapState } from "vuex";
+import { mapGetters } from "vuex";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { BarChart } from "echarts/charts";
@@ -56,11 +55,7 @@ export default {
 
   data() {
     return {
-      // You can manually set the theme for each plot for visibility.
-      theme: "dark",
-      // These are the options for the Generation Pie Graph
       genName: [],
-      genVal: [],
       genPie: {
         title: {
           text: "Current Generation Distribution (By Generator)",
@@ -82,7 +77,7 @@ export default {
           type: "scroll",
           orient: "horizontal",
           bottom: 20,
-          data: this.genName,
+          data: [],
         },
         series: [
           {
@@ -97,26 +92,20 @@ export default {
   },
   methods: {
     initGenPlot() {
-      console.log(this.$store.state);
-      // Initiailizing all the data in the plot.
-      for (let i in this.$store.state.genData) {
-        this.genName.push(this.$store.state.genData[i]["name"]);
-        this.genVal.push({
-          name: this.$store.state.genData[i]["name"],
-          value: this.$store.state.genData[i]["MW"],
-        });
+      const genData = this.getGenData;
+      for (let i in genData) {
+        this.genName.push(genData[i]["name"]);
       }
-      // These are the options for the generation bar chart.
+      this.genPie.legend.data = this.genName;
     },
-    // This function is used to update the plot of the generation.
     updateGenPlot() {
       try {
+        const genData = this.getGenData;
         var temp = [];
-        for (let i in this.$store.state.genData) {
-          this.genName.push(this.$store.state.genData[i]["name"]);
+        for (let i in genData) {
           temp.push({
-            name: this.$store.state.genData[i]["name"],
-            value: this.$store.state.genData[i]["MW"],
+            name: genData[i]["name"],
+            value: genData[i]["MW"],
           });
         }
         chart.setOption({
@@ -130,9 +119,6 @@ export default {
       } catch (e) {
         console.log(e);
       }
-      // This is the same thing as initializing the plot. I think ideally, we set this so that it
-      // only changes the values for the generators that have been changed, but this should be okay
-      // for now.
     },
     reload() {
       setTimeout(() => {
@@ -142,8 +128,13 @@ export default {
       }, 800);
     },
   },
+  computed: {
+    ...mapGetters(["getGenData", "getAreaData"]),
+    areaGenMw() {
+      return this.getAreaData ? this.getAreaData.gen_mw : 0;
+    },
+  },
   mounted() {
-    // For every initialization method, you have to call it through mounted.
     this.initGenPlot();
     chart = echarts.init(document.getElementById("genpie"), "dark");
     chart.setOption(this.genPie);
@@ -151,9 +142,6 @@ export default {
       this.updateGenPlot();
     }, 1000);
     window.addEventListener("resize", this.reload);
-  },
-  computed: {
-    ...mapState(["areaData"]),
   },
   beforeDestroy() {
     clearInterval(this.Process);

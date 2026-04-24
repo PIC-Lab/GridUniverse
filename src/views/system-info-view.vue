@@ -25,7 +25,7 @@
       </v-flex>
       <v-flex lg6 xs12>
         <v-card color="rgb(0, 255, 0, 0.3)" height="85" raised>
-          <div class="display-3 font-weight-bold" align="center">{{ areaData[6] }} Hz</div>
+          <div class="display-3 font-weight-bold" align="center">{{ areaData ? areaData.frequency : 0 }} Hz</div>
         </v-card>
       </v-flex>
       <v-flex lg6 xs12>
@@ -37,7 +37,7 @@
       </v-flex>
       <v-flex lg6 xs12>
         <v-card color="rgb(0, 0, 255, 0.6)" height="85" raised>
-          <div class="display-3 font-weight-bold" align="center">{{ areaData[0] }} MW</div>
+          <div class="display-3 font-weight-bold" align="center">{{ areaData ? areaData.gen_mw : 0 }} MW</div>
         </v-card>
       </v-flex>
       <v-flex lg6 xs12>
@@ -49,7 +49,7 @@
       </v-flex>
       <v-flex lg6 xs12>
         <v-card color="rgb(255, 255, 0, 0.8)" height="85" raised>
-          <div class="display-3 font-weight-bold" align="center">{{ areaData[2] }} MW</div>
+          <div class="display-3 font-weight-bold" align="center">{{ areaData ? areaData.load_mw : 0 }} MW</div>
         </v-card>
       </v-flex>
       <!-- <v-flex lg6 xs12>
@@ -61,7 +61,7 @@
       </v-flex>
       <v-flex lg6 xs12>
         <v-card color="rgb(255, 0, 0, 0.8)" height="85" raised>
-          <div class="display-3 font-weight-bold" align="center">{{ areaData[8] }} MW</div>
+          <div class="display-3 font-weight-bold" align="center">{{ areaData ? areaData.loss_mw : 0 }} MW</div>
         </v-card>
       </v-flex> -->
       <v-flex lg6 xs12>
@@ -85,7 +85,7 @@
       </v-flex>
       <v-flex lg6 xs12>
         <v-card color="rgb(255, 127, 80)" height="85" raised>
-          <div class="display-3 font-weight-bold" align="center">{{ areaData[5] }} MW</div>
+          <div class="display-3 font-weight-bold" align="center">{{ areaData ? areaData.export_mw : 0 }} MW</div>
         </v-card>
       </v-flex>
       <v-flex lg12>
@@ -97,14 +97,17 @@
 
 <script>
 import barPlot from "@/components/barPlot";
-import {mapState} from 'vuex'
+import {mapGetters} from 'vuex'
 
 export default {
   components: {
     barPlot
   },
   computed: {
-    ...mapState(["clockTime", "areaData", "totalCost"])
+    ...mapGetters(["getClockTime", "getAreaData", "getTotalCost"]),
+    clockTime() { return this.getClockTime || "00:00:00"; },
+    areaData() { return this.getAreaData; },
+    totalCost() { return this.getTotalCost; },
   },
 };
 </script>

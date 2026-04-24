@@ -19,6 +19,7 @@
 </style>
 
 <script>
+import { mapGetters } from "vuex";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { BarChart } from "echarts/charts";
@@ -44,12 +45,8 @@ let chart = '';
 
 export default {
   name: "barplot",
-  components: {
-  },
   data() {
     return {
-      // You can manually set the theme for each plot for visibility.
-      // These are the options for the Generation Bar Graph
       genXaxis: [],
       genYaxis: [],
       maxGen: [],
@@ -57,45 +54,29 @@ export default {
   },
   methods: {
     initGenPlot() {
-      // Initiailizing all the data in the plot.
-      // console.log(this.$store.state.genData);
-      for (let i in this.$store.state.genData) {
-        this.genXaxis.push(this.$store.state.genData[i]["name"]);
-        this.genYaxis.push(this.$store.state.genData[i]["MW"]);
-        this.maxGen.push(this.$store.state.genData[i]["MWMax"]);
+      const genData = this.getGenData;
+      for (let i in genData) {
+        this.genXaxis.push(genData[i]["name"]);
+        this.genYaxis.push(genData[i]["MW"]);
+        this.maxGen.push(genData[i]["MWMax"]);
       }
-      // These are the options for the generation bar chart.
     },
-    // This function is used to update the plot of the generation.
     updateGenPlot() {
       try {
         var temp = [];
-        for (let i in this.$store.state.genData) {
-          temp.push(this.$store.state.genData[i]["MW"]);
+        const genData = this.getGenData;
+        for (let i in genData) {
+          temp.push(genData[i]["MW"]);
           this.genYaxis = temp;
         }
         chart.setOption(this.genBar);
       } catch (e) {
         console.log(e);
       }
-      // This is the same thing as initializing the plot. I think ideally, we set this so that it
-      // only changes the values for the generators that have been changed, but this should be okay
-      // for now.
     },
   },
-  mounted() {
-    // For every initialization method, you have to call it through mounted.
-    this.initGenPlot();
-    chart = echarts.init(document.getElementById("barplot"), "dark");
-    chart.setOption(this.genBar);
-    this.Process = setInterval(() => {
-      this.updateGenPlot();
-    }, 1000);
-  },
-  beforeDestroy() {
-    clearInterval(this.Process);
-  },
   computed: {
+    ...mapGetters(["getGenData"]),
     genBar() {
       return {
         title: {
@@ -152,6 +133,17 @@ export default {
         ],
       };
     },
+  },
+  mounted() {
+    this.initGenPlot();
+    chart = echarts.init(document.getElementById("barplot"), "dark");
+    chart.setOption(this.genBar);
+    this.Process = setInterval(() => {
+      this.updateGenPlot();
+    }, 1000);
+  },
+  beforeDestroy() {
+    clearInterval(this.Process);
   },
 };
 </script>

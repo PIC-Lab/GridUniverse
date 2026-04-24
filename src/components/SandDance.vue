@@ -4,16 +4,11 @@
       <v-flex xs12>
         <div id="sanddance"></div>
       </v-flex>
-      <!-- <v-flex lg2 xs12>
-        <v-btn @click="change">test</v-btn>
-      </v-flex> -->
     </v-layout>
   </v-container>
 </template>
 
 <script>
-// import * as SandDance from "@msrvida/sanddance";
-// SandDance.use(window.vega, window.deck, window.deck, window.luma);
 import * as deck from "@deck.gl/core";
 import * as layers from "@deck.gl/layers";
 import * as luma from "@luma.gl/core";
@@ -30,13 +25,7 @@ export default {
   data() {
     return {
       Interval: "",
-      anchor: 0,
-      loadDataLength: 0,
-      loadArray: [],
     };
-  },
-  created() {
-    this.preProcess();
   },
   mounted() {
     this.initTable();
@@ -49,15 +38,11 @@ export default {
     init() {
       scatterplotTest.viewer = new SandDance.Viewer(
         document.getElementById("sanddance"),
-        {
-          hideSidebarControls: true,
-        }
+        { hideSidebarControls: true }
       );
       scatterplotTest.viewer.options.colors.axisLine = [255, 255, 255, 255];
       scatterplotTest.viewer.options.colors.axisText = [255, 255, 255, 255];
       scatterplotTest.viewer.options.colors.hoveredCube = [255, 255, 255, 255];
-      // scatterplotTest.viewer.vegaSpec.autosize = "pad";
-      // console.log(scatterplotTest.viewer.vegaSpec)
       var glDiv = scatterplotTest.viewer.presenter.getElement(
         SandDance.VegaDeckGl.PresenterElement.gl
       );
@@ -73,18 +58,17 @@ export default {
           size: "LoadMW",
           group: "GenMW",
         },
-        facets: null, //null,
+        facets: null,
         hideLegend: false,
         signaValues: null,
         view: "2d",
-        scheme: "redblue", //redblue
+        scheme: "redblue",
         size: {
           height: glDiv.offsetHeight,
           width: glDiv.offsetWidth,
         },
         chart: "scatterplot",
       };
-
       scatterplotTest.viewer.render(insight, buses);
     },
     change() {
@@ -97,54 +81,24 @@ export default {
         insight["chart"] = "scatterplot";
       }
       scatterplotTest.viewer.render(insight, buses);
-      //   scatterplotTest.viewer.colorContexts[0].legend.rows['6'].label = "≥ 1.05";
-      // console.log(scatterplotTest.viewer);
-    },
-    preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        if (ele != "Bus") {
-          anchor += arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
-      this.anchor = anchor;
-      this.loadDataLength = arrlength;
     },
     initTable() {
+      const caseData = this.$store.state.caseData;
+      if (!caseData) return;
       let temp = [];
-      let count = 0;
-      let subID;
-      for (let i in this.$store.state.areadetail.content.Bus) {
-        if (
-          this.$store.state.areadetail.content.Bus[i]["Int.Area Number"] ==
-          +this.$store.state.area
-        ) {
-          this.loadArray.push(count);
-          subID = this.$store.state.areadetail.content.Bus[i]["Int.Sub Number"];
+      const busData = caseData.content.Bus || {};
+      const subs = caseData.content.Substation || {};
+      const area = this.$store.state.area;
+      for (let i in busData) {
+        if (busData[i]["Int.Area Number"] == +area) {
+          const subID = busData[i]["Int.Sub Number"];
+          const sub = subs[String(subID)] || {};
           temp.push({
             Id: i,
             "Symbol(vega_id)": i,
-            Latitude:
-              this.$store.state.areadetail.content.Substation[subID.toString()][
-                "Double.Latitude"
-              ],
-            Longitude:
-              this.$store.state.areadetail.content.Substation[subID.toString()][
-                "Double.Longitude"
-              ],
-            name:
-              this.$store.state.areadetail.content.Bus[i.split(",")[0]][
-                "String.Name"
-              ] +
-              " " +
-              i.split(",")[1],
+            Latitude: sub["Double.Latitude"] || 0,
+            Longitude: sub["Double.Longitude"] || 0,
+            name: (busData[i]["String.Name"] || "") + " " + i,
             Status: 1,
             Vpu: 1,
             FreqHz: 60,
@@ -153,36 +107,33 @@ export default {
             LoadMW: 0,
           });
         }
-        count++;
       }
       buses = temp;
-      if (buses.length > 1) {
-        return Promise.resolve("Table initialized properly");
-      } else {
-        return Promise.reject("Error in initialization");
-      }
     },
     updateTable() {
-      try {
-        const temp = this.$store.state.parsedData;
-        for (let i in buses) {
-          buses[i].Vpu =
-            temp[this.anchor + this.loadArray[i] * this.loadDataLength];
-          buses[i].Vangle =
-            temp[this.anchor + 1 + this.loadArray[i] * this.loadDataLength];
-          buses[i].FreqHz =
-            temp[this.anchor + 2 + this.loadArray[i] * this.loadDataLength];
-          buses[i].Status =
-            temp[this.anchor + 3 + this.loadArray[i] * this.loadDataLength];
-          buses[i].GenMW =
-            temp[this.anchor + 4 + this.loadArray[i] * this.loadDataLength];
-          buses[i].GenMvar =
-            temp[this.anchor + 5 + this.loadArray[i] * this.loadDataLength];
-          buses[i].LoadMW =
-            temp[this.anchor + 6 + this.loadArray[i] * this.loadDataLength];
+      const simState = this.$store.state.simState;
+      if (!simState || !buses) return;
+      const simBuses = simState.bus || {};
+      const simGens = simState.gen || {};
+      const simLoads = simState.load || {};
+      for (let i in buses) {
+        const busId = buses[i].Id;
+        const live = simBuses[busId] || {};
+        buses[i].Vpu = live.vpu || 1;
+        buses[i].FreqHz = simState.area ? simState.area.frequency : 60;
+        buses[i].Status = live.status != null ? live.status : 1;
+        // Sum gen MW at this bus
+        let genMW = 0;
+        for (let gk in simGens) {
+          if (gk.startsWith(busId)) genMW += simGens[gk].mw || 0;
         }
-      } catch (e) {
-        console.log("The raw data are not ready");
+        buses[i].GenMW = genMW;
+        // Sum load MW at this bus
+        let loadMW = 0;
+        for (let lk in simLoads) {
+          if (lk.startsWith(busId)) loadMW += simLoads[lk].mw || 0;
+        }
+        buses[i].LoadMW = loadMW;
       }
     },
   },
@@ -203,9 +154,6 @@ export default {
   width: 90%;
   margin-right: 1em;
 }
-/* .sanddance-panel {
-  display: none;
-} */
 .sanddance-tooltip table {
   background: #333;
   color: #fff;
@@ -215,13 +163,11 @@ export default {
   padding: 6px;
   position: absolute;
 }
-
 .sanddance-tooltip td {
   text-align: left;
   vertical-align: top;
   width: 75%;
 }
-
 .sanddance-tooltip td:first-child {
   width: 25%;
 }

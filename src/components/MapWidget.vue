@@ -416,7 +416,7 @@ export default {
       // remove.zoomControl.remove();
     },
     getData() {
-      const temp = this.$store.state.casedetail;
+      const temp = this.$store.state.caseData;
       if (temp.content.type == "dsmDictionary") {
         this.subdetail = temp.content.Substation;
         this.busdetail = temp.content.Bus;

@@ -9,10 +9,7 @@
             <v-tab
               :key="'General'"
               :href="'#tab-General'"
-              @click="
-                childshow = false;
-                atDefault = true;
-              "
+              @click="atDefault = true"
               >General</v-tab
             >
             <v-tab
@@ -44,20 +41,8 @@
                 >
                   {{ item }}
                 </td>
-                <!-- <td class="text-xs-right">{{ props.item.GenMvar }}</td>
-								<td class="text-xs-right">{{ props.item.LoadMW }}</td>
-								<td class="text-xs-right">{{ props.item.LoadMvar }}</td>
-								<td class="text-xs-right">{{ props.item.ShuntMW }}</td>
-								<td class="text-xs-right">{{ props.item.ShuntMvar }}</td>
-								<td class="text-xs-right">{{ props.item.FrequencyAve }}</td> -->
               </template>
             </v-data-table>
-          </v-card>
-          <v-card>
-            <!-- <v-card-title class='headline'>
-							Oneline Diagram (In Development)
-						</v-card-title> -->
-            <!-- <highTopo></highTopo> -->
           </v-card>
         </v-tab-item>
         <v-tab-item
@@ -79,61 +64,34 @@
   </div>
 </template>
 
-<style>
-</style>
-
 <script>
-// import popchild from './popchild';
-import { mapGetters } from "vuex";
-// import highTopo from '@/components/highTopo';
-
 export default {
   data() {
-    let myList = this.$store.state.fieldstore.Substation["Field"].map(function (
-      key
-    ) {
-      return { text: key, value: key };
-    });
     return {
-      dropdown: [],
       currentItem: "tab-General",
       display: [],
       atDefault: true,
-      childshow: false,
-      headers: myList,
+      headers: [
+        { text: "Substation", value: "Substation" },
+        { text: "Latitude", value: "Latitude" },
+        { text: "Longitude", value: "Longitude" },
+      ],
     };
   },
   props: {
-    visible: {
-      type: Boolean,
-      default: false,
-    },
-    type: {
-      type: String,
-    },
-    id: {
-      type: String,
-    },
-    name: {
-      type: String,
-    },
-    volt: {
-      type: String,
-    },
+    visible: { type: Boolean, default: false },
+    type: { type: String },
+    id: { type: String },
+    name: { type: String },
+    volt: { type: String },
     children: {},
   },
   computed: {
-    ...mapGetters({
-      dataflag: "rawData",
-    }),
     show: {
-      get() {
-        return this.visible;
-      },
+      get() { return this.visible; },
       set(value) {
         if (!value) {
           this.display = [];
-          this.childshow = false;
           this.$emit("close");
         }
       },
@@ -146,45 +104,30 @@ export default {
       return temp;
     },
   },
-  methods: {
-    getData() {
-      const message = this.$store.getters.rawData;
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-      const temp = message.Data;
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        if (ele != this.type) {
-          anchor += arrlength * keyarr.length;
-        } else {
-          anchor += arrlength * keyarr.indexOf(this.id);
-          break;
-        }
-        // console.log(Object.keys(this.$store.state.fieldstore).indexOf(ele))
-        // console.log(Object.keys(this.$store.state.casedetail.content[ele]).length)
-        // console.log(this.$store.state.fieldstore[ele].length)
+  watch: {
+    visible: function(val) {
+      if (val && this.atDefault) {
+        this.getData();
       }
-      const spdata = temp.slice(anchor, anchor + arrlength);
-      let container = {};
-      for (let e in spdata) {
-        container[this.$store.state.fieldstore[this.type]["Field"][e]] =
-          spdata[e];
-      }
-      this.display = [container];
     },
   },
-  watch: {
-    dataflag: function () {
-      if (this.show && this.atDefault) {
-        this.getData();
+  methods: {
+    getData() {
+      const caseData = this.$store.state.caseData;
+      if (!caseData) return;
+      const subs = caseData.content.Substation || {};
+      const sub = subs[this.id];
+      if (sub) {
+        this.display = [{
+          Substation: sub["String.Name"],
+          Latitude: sub["Double.Latitude"],
+          Longitude: sub["Double.Longitude"],
+        }];
       }
     },
   },
   components: {
     popchild: () => import("./popchild"),
-    // highTopo
   },
 };
 </script>

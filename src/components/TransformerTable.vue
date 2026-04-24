@@ -15,16 +15,14 @@
         <v-data-table
           class="fixed-header"
           :headers="headers"
-          :items="Transformers"
+          :items="transformers"
           :items-per-page-options="defaultRowItems"
           v-model="selected"
           show-select
           item-key="name"
         >
           <template slot="headerCell" slot-scope="props">
-            <!-- <v-tooltip bottom> -->
             <span slot="activator">{{ props.header.text }}</span>
-            <!-- </v-tooltip> -->
           </template>
           <template slot="items" slot-scope="props">
             <tr :active="props.selected">
@@ -42,11 +40,6 @@
               <td class="text-xs-right">{{ props.item.Temperature }}</td>
             </tr>
           </template>
-          <!-- <template slot="expand" slot-scope="props">
-				<v-card flat>
-					<v-card-text>Peek-a-boo!</v-card-text>
-				</v-card>
-          </template>-->
         </v-data-table>
       </template>
       <v-divider></v-divider>
@@ -74,7 +67,7 @@ table.v-table thead th:not(:first-child) {
 }
 
 .fixed-header th {
-  background-color: #fff; /* just for LIGHT THEME, change it to #474747 for DARK */
+  background-color: #fff;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -91,6 +84,8 @@ table.v-table thead th:not(:first-child) {
 </style>
 
 <script>
+import { mapGetters } from "vuex";
+
 export default {
   props: {
     title: String
@@ -98,149 +93,51 @@ export default {
   data() {
     return {
       headers: [
-        {
-          text: "Transformer",
-          align: "left",
-          // sortable: false,
-          value: "name",
-          width: "15%"
-        },
+        { text: "Transformer", align: "left", value: "name", width: "15%" },
         { text: "Phase", align: "left", value: "Degree" },
         { text: "Tap", align: "left", value: "Ratio" },
         { text: "Temperature", value: "Fahrenheit" }
       ],
-      Transformers: [],
       selected: [],
-      anchor: 0,
-      TransformerDataLength: 0,
       defaultRowItems: [
         15,
         30,
         { text: "$vuetify.dataIterator.rowsPerPageAll", value: -1 }
       ],
-      TransformerArray: this.$store.state.areaHelper.Transformer.list,
-      Interval: null
     };
   },
-  methods: {
-    preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]['Field'].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        console.log(ele);
-        if (ele != "Transformer") {
-          anchor += arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
-      this.anchor = anchor;
-      this.transformerDataLength = arrlength;
+  computed: {
+    ...mapGetters(["getTransformerData", "getCaseData", "getStatus"]),
+    transformers() {
+      if (!this.getCaseData) return [];
+      const transformers = this.getCaseData.content.Transformer || {};
+      const buses = this.getCaseData.content.Bus || {};
+      const transLive = {};
+      this.getTransformerData.forEach(t => { transLive[t.key] = t; });
+      return Object.entries(transformers).map(([key, data]) => {
+        const live = transLive[key] || {};
+        const fromBus = buses[key.split(",")[0]];
+        const toBus = buses[key.split(",")[1]];
+        return {
+          key,
+          name: (fromBus?.["String.Name"] || "") +
+            "-" +
+            (toBus?.["String.Name"] || ""),
+          id: data["String.CircuitID"],
+          Phase: live.phase_angle || 0,
+          Tap: live.tap || 1,
+          Temperature: 100,
+        };
+      });
     },
-    initTable() {
-      let temp = [];
-      this.anchor = this.$store.state.areaHelper.Transformer.anchor;
-      this.TransformerDataLength = this.$store.state.areaHelper.Transformer.length;
-      // let subID;
-      for (let i in this.$store.state.areadetail.content.Transformer) {
-        if (
-          [
-            this.$store.state.areadetail.content.Transformer[i]["FromArea"],
-            this.$store.state.areadetail.content.Transformer[i]["ToArea"]
-          ].includes(+this.$store.state.area)
-        ) {
-          temp.push({
-            value: false, //[this.$store.state.areadetail.content.Substation[subID.toString()]["Double.Longitude"], this.$store.state.areadetail.content.Substation[subID.toString()]["Double.Latitude"]],
-            key: i,
-            name:
-              this.$store.state.casedetail.content.Bus[i.split(",")[0]][
-                "String.Name"
-              ] +
-              "-" +
-              this.$store.state.casedetail.content.Bus[i.split(",")[1]][
-                "String.Name"
-              ],
-            id: this.$store.state.areadetail.content.Transformer[i][
-              "String.CircuitID"
-            ],
-            Phase: 0,
-            Tap: 1,
-            Temperature: null
-          });
-        }
-      }
-      this.Transformers = temp;
-      if (this.Transformers.length > 1) {
-        return Promise.resolve("Table initialized properly");
-      } else {
-        return Promise.reject("Error in initialization");
-      }
+    disable() {
+      return this.getStatus !== "running";
     },
-    updateTable() {
-      this.Interval = setInterval(() => {
-        try {
-          for (let i in this.Transformers) {
-            this.Transformers[i].Phase = this.$store.state.transformerData[
-              0 + i * this.TransformerDataLength
-            ];
-            this.Transformers[i].Tap = this.$store.state.transformerData[
-              1 + i * this.TransformerDataLength
-            ]; // MW is the 6th in the load data
-            this.Transformers[i].Temperature = 100;
-          }
-        } catch (e) {
-          console.log(e);
-          console.log("The raw data are not ready");
-        }
-      }, 500);
-    },
-    toggle(item) {
-      var command;
-      if (item.vStatus) {
-        item.vStatus = 1;
-        command = "CLOSE BOTH";
-      } else {
-        item.vStatus = 0;
-        command = "OPEN BOTH";
-      }
-      // console.log(item);
-      this.$store.commit("setMessage", [
-        "Transformers",
-        item.key,
-        item.key,
-        command
-      ]);
-      this.$store.commit("recordAction", ["Transformers", item.key]);
-      this.$store.commit("setPublish");
-    }
-  },
-  created() {
-    // this.preProcess();
-    // this.initTable();
-  },
-  mounted() {
-    this.initTable().then(() => this.updateTable());
   },
   watch: {
-    selected: function(newval, oldval) {
+    selected: function(newval) {
       this.$store.commit("updateSelectedShunts", newval);
     }
   },
-  computed: {
-    disable() {
-      if (this.$store.state.status == "running") {
-        return false;
-      } else {
-        return true;
-      }
-    }
-  },
-  beforeDestroy() {
-    clearInterval(this.Interval);
-  }
 };
 </script>

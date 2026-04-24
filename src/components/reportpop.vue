@@ -318,8 +318,8 @@ export default {
     },
     findName([type, id]) {
       if (["Gen", "Shunt"].includes(type)) {
-        return this.$store.state.casedetail.content.Bus[
-          this.$store.state.casedetail.content[type][id][
+        return this.$store.state.caseData.content.Bus[
+          this.$store.state.caseData.content[type][id][
             "Int.Bus Number"
           ].toString()
         ]["String.Name"];

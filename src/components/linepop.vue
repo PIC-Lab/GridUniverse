@@ -36,122 +36,73 @@
 </template>
 
 <script>
-import { mapGetters } from "vuex";
-
 export default {
   data() {
-    let temp = [];
-    for (var j in this.$store.state.tcmcommands.Branch) {
-      let jj = j;
-      temp.push({
-        text: this.$store.state.tcmcommands.Branch[j],
-        callback: () => {
-          this.$store.commit("setMessage", [
-            this.type,
-            this.id,
-            this.name,
-            this.$store.state.tcmcommands.Branch[jj],
-          ]);
-          this.$store.commit("setPublish");
-        },
-      });
-    }
-    let myList = this.$store.state.fieldstore.Branch["Field"].map(function (
-      key
-    ) {
-      return { text: key, value: key };
-    });
     return {
-      dropdown: temp,
+      dropdown: [
+        { text: "OPEN BOTH", callback: () => this.sendCommand("OPEN BOTH") },
+        { text: "CLOSE BOTH", callback: () => this.sendCommand("CLOSE BOTH") },
+      ],
       display: [],
-      anchor: 0,
-      arrlength: null,
-      keyarr: null,
-      Interval: null,
-      headers: myList
+      headers: [
+        { text: "From Bus", value: "From Bus" },
+        { text: "To Bus", value: "To Bus" },
+        { text: "Circuit ID", value: "Circuit ID" },
+        { text: "MVA Limit", value: "MVA Limit" },
+        { text: "Status", value: "Status" },
+      ],
     };
   },
   props: {
-    visible: {
-      type: Boolean,
-      default: false,
-    },
-    type: {
-      type: String,
-    },
-    id: {
-      type: String,
-    },
-    name: {
-      type: String,
-      default: "NULL",
-    },
-    volt: {
-      type: String,
-      default: "",
-    },
-    data: {
-      default: function () {
-        return [];
-      },
-    },
+    visible: { type: Boolean, default: false },
+    type: { type: String },
+    id: { type: String },
+    name: { type: String, default: "NULL" },
+    volt: { type: String, default: "" },
+    data: { default: () => [] },
   },
   computed: {
     show: {
-      get() {
-        return this.visible;
-      },
-      set(value) {
-        if (!value) {
-          this.$emit("close");
-        }
-      },
+      get() { return this.visible; },
+      set(value) { if (!value) this.$emit("close"); },
+    },
+  },
+  watch: {
+    visible(val) {
+      if (val) this.getData();
     },
   },
   methods: {
-    init() {
-      for (let ele in this.$store.state.fieldstore) {
-        this.arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        this.keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        if (ele != this.type) {
-          this.anchor += this.arrlength * this.keyarr.length;
+    async sendCommand(command) {
+      try {
+        const { deviceApi } = await import("@/services/api");
+        if (command === "OPEN BOTH") {
+          await deviceApi.openBranch(this.id);
         } else {
-          this.anchor += this.arrlength * this.keyarr.indexOf(this.id);
-          break;
+          await deviceApi.closeBranch(this.id);
         }
-        // console.log(Object.keys(this.$store.state.fieldstore).indexOf(ele))
-        // console.log(Object.keys(this.$store.state.casedetail.content[ele]).length)
-        // console.log(this.$store.state.fieldstore[ele].length)
+      } catch (e) {
+        console.error("Branch command failed:", e);
       }
     },
     getData() {
-      const temp = this.$store.state.parsedData;
-      const spdata = this.$store.state.parsedData.slice(
-        this.anchor,
-        this.anchor + this.arrlength
-      );
-      // const spdata = this.$store.state.branchData;
-      let container = {};
-      for (let e in spdata) {
-        container[this.$store.state.fieldstore[this.type]["Field"][e]] =
-          spdata[e];
+      const caseData = this.$store.state.caseData;
+      const simState = this.$store.state.simState;
+      if (!caseData) return;
+      const branch = (caseData.content.Branch || {})[this.id];
+      const liveBranch = (simState && simState.branch) ? simState.branch[this.id] : null;
+      if (branch) {
+        const fromBus = caseData.content.Bus[this.id.split(",")[0]];
+        const toBus = caseData.content.Bus[this.id.split(",")[1]];
+        this.display = [{
+          "From Bus": fromBus ? fromBus["String.Name"] : this.id.split(",")[0],
+          "To Bus": toBus ? toBus["String.Name"] : this.id.split(",")[1],
+          "Circuit ID": branch["String.CircuitID"] || "",
+          "MVA Limit": branch["Single.MVA Limit"] || 0,
+          "Status": liveBranch ? liveBranch.status : 1,
+        }];
       }
-      this.display = [container];
     },
   },
-  mounted() {
-    this.init();
-    this.Interval = setInterval(() => {
-      this.getData();
-    }, 500);
-  },
-  beforeDestroy() {
-    clearInterval(this.Interval);
-  },
-  // watch: {
-  // 	dataflag: function() {
-  // 		this.getData();
-  // 	}
-  // }
 };
 </script>

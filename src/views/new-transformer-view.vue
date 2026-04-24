@@ -204,7 +204,7 @@ export default {
         30,
         { text: "$vuetify.dataIterator.rowsPerPageAll", value: -1 },
       ],
-      TransformerArray: this.$store.state.areaHelper.Transformer.list,
+      TransformerArray: [],
       transformerChart: {},
       temperatureChart: {},
       subdata: [],
@@ -435,63 +435,33 @@ export default {
       // leafletMap.zoomControl.remove();
     },
     preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]['Field'].length;
-        keyarr = Object.keys(this.$store.state.areadetail.content[ele]);
-        console.log(ele);
-        if (ele != "Transformer") {
-          anchor += arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
-      this.anchor = anchor;
-      this.transformerDataLength = arrlength;
+      // No longer needed
     },
     initTable() {
       let temp = [];
       let subid;
-      this.anchor = this.$store.state.areaHelper.Transformer.anchor;
-      this.TransformerDataLength =
-        this.$store.state.areaHelper.Transformer.length;
-      // let subID;
-      for (let i in this.$store.state.areadetail.content.Transformer) {
+      const caseData = this.$store.state.caseData;
+      if (!caseData) return Promise.reject("No case data");
+      const trans = caseData.content.Transformer || {};
+      const buses = caseData.content.Bus || {};
+      for (let i in trans) {
         if (
-          [
-            this.$store.state.areadetail.content.Transformer[i]["FromArea"],
-            this.$store.state.areadetail.content.Transformer[i]["ToArea"],
-          ].includes(+this.$store.state.area)
+          [trans[i]["FromArea"], trans[i]["ToArea"]].includes(+this.$store.state.area)
         ) {
           temp.push({
-            value: false, //[this.$store.state.areadetail.content.Substation[subID.toString()]["Double.Longitude"], this.$store.state.areadetail.content.Substation[subID.toString()]["Double.Latitude"]],
+            value: false,
             key: i,
             name:
-              this.$store.state.casedetail.content.Bus[i.split(",")[0]][
-                "String.Name"
-              ] +
+              (buses[i.split(",")[0]] || {})["String.Name"] +
               "-" +
-              this.$store.state.casedetail.content.Bus[i.split(",")[1]][
-                "String.Name"
-              ] +
+              (buses[i.split(",")[1]] || {})["String.Name"] +
               "-" +
-              this.$store.state.areadetail.content.Transformer[i][
-                "String.CircuitID"
-              ],
+              trans[i]["String.CircuitID"],
             kv:
-              this.$store.state.casedetail.content.Bus[i.split(",")[0]][
-                "Single.Nominal kV"
-              ] +
+              (buses[i.split(",")[0]] || {})["Single.Nominal kV"] +
               "/" +
-              this.$store.state.casedetail.content.Bus[i.split(",")[1]][
-                "Single.Nominal kV"
-              ],
-            id: this.$store.state.areadetail.content.Transformer[i][
-              "String.CircuitID"
-            ],
+              (buses[i.split(",")[1]] || {})["Single.Nominal kV"],
+            id: trans[i]["String.CircuitID"],
             Phase: 0,
             Tap: 1,
             Temperature: null,
@@ -500,17 +470,12 @@ export default {
             GICIEff: null,
           });
           subid =
-            this.$store.state.casedetail.content.Bus[i.split(",")[0]][
-              "Int.Sub Number"
-            ].toString();
+            (buses[i.split(",")[0]] || {})["Int.Sub Number"];
+          const subs = caseData.content.Substation || {};
           this.transData.push({
             value: [
-              this.$store.state.areadetail.content.Substation[subid][
-                "Double.Longitude"
-              ],
-              this.$store.state.areadetail.content.Substation[subid][
-                "Double.Latitude"
-              ],
+              (subs[subid] || {})["Double.Longitude"],
+              (subs[subid] || {})["Double.Latitude"],
             ],
             attribute: {
               GICNeutralCurrent: null,
@@ -530,44 +495,16 @@ export default {
     updateTable() {
       setInterval(() => {
         try {
-          // const temp = JSON.parse(this.$store.state.rawdata).Data;
-          // const message = JSON.parse(this.$store.state.rawdata)
-          // console.log(message);
-          // const temp = this.$store.state.data;
-          // console.log(this.branches)
-          // console.log(this.$store.state.transformerData)
-          // console.log(this.TransformerDataLength)
-          let temp = this.transformerChart._echartsOptions;
-          const keys = Object.keys(this.$store.state.temperatureData);
+          // TODO: Update transformer data from backend simState when available
+          const simTrans = this.$store.state.simState
+            ? this.$store.state.simState.transformer || {}
+            : {};
           for (let i in this.Transformers) {
-            // this.Transformers[i].Phase =
-            // 	this.$store.state.transformerData[0 + i * this.TransformerDataLength];
-            // this.Transformers[i].Tap =
-            // 	this.$store.state.transformerData[1 + i * this.TransformerDataLength]; // MW is the 6th in the load data
-            this.Transformers[i].Temperature =
-              this.$store.state.temperatureData[keys[i]][this.count];
-            this.Transformers[i].GICNeutralCurrent =
-              this.$store.state.transformerData[
-                2 + i * this.TransformerDataLength
-              ];
-            this.Transformers[i].GICMvarLosses =
-              this.$store.state.transformerData[
-                3 + i * this.TransformerDataLength
-              ];
-            this.Transformers[i].GICIEff =
-              this.$store.state.transformerData[
-                4 + i * this.TransformerDataLength
-              ];
-            // temp.series[0].data[i].attribute['Temperature'] = this.Transformers[
-            // 	i
-            // ].Temperature;
-            // temp.series[0].data[i].attribute[
-            // 	'GICNeutralCurrent'
-            // ] = this.Transformers[i].GICNeutralCurrent;
-            this.transData[i].attribute["GICNeutralCurrent"] =
-              this.Transformers[i].GICNeutralCurrent;
-            this.transData[i].attribute["Temperature"] =
-              this.Transformers[i].Temperature;
+            const live = simTrans[this.Transformers[i].key] || {};
+            this.Transformers[i].Phase = live.phase_angle || 0;
+            this.Transformers[i].Tap = live.tap || 1;
+            this.Transformers[i].Temperature = 100;
+            this.transData[i].attribute["Temperature"] = 100;
           }
           // this.transformerChart.setOption(temp);
           if (this.gicEnabled) {
@@ -712,14 +649,19 @@ export default {
         command = "OPEN BOTH";
       }
       // console.log(item);
-      this.$store.commit("setMessage", [
-        "Transformers",
-        item.key,
-        item.key,
-        command,
-      ]);
-      this.$store.commit("recordAction", ["Transformers", item.key]);
-      this.$store.commit("setPublish");
+      this.toggleTransformer(item, command);
+    },
+    async toggleTransformer(item, command) {
+      try {
+        const { deviceApi } = await import("@/services/api");
+        if (command === "OPEN BOTH") {
+          await deviceApi.openBranch(item.key);
+        } else {
+          await deviceApi.closeBranch(item.key);
+        }
+      } catch (e) {
+        console.error("Transformer command failed:", e);
+      }
     },
   },
   created() {

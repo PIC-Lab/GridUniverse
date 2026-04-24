@@ -378,7 +378,7 @@ export default {
       // });
     },
     getData() {
-      const temp = this.$store.state.casedetail;
+      const temp = this.$store.state.caseData;
       this.case = temp;
       //console.log(temp.content);
       if (temp.content.type == "dsmDictionary") {
@@ -954,56 +954,37 @@ export default {
       };
     },
     onFindBranchSegment() {
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        this.arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.casedetail.content[ele]);
-
-        if (ele != "Branch") {
-          this.anchor += this.arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
+      // No longer needed - branch data comes from simState
     },
     onMonitor() {
-      const temp = this.$store.state.data;
+      const simState = this.$store.state.simState;
+      if (!simState) return;
+      const simBranches = simState.branch || {};
+      const caseBranches = this.$store.state.caseData ? this.$store.state.caseData.content.Branch : {};
       var branchMVALimit;
       var rtMVA;
-      var idx = -1;
-      var rowidx;
       var violatedBasins = [];
 
-      for (let e in this.$store.state.casedetail.content.Branch) {
-        idx++;
+      for (let e in caseBranches) {
+        branchMVALimit = caseBranches[e]["Single.MVA Limit"];
+        const live = simBranches[e] || {};
+        rtMVA = live.mva_from || 0;
 
-        branchMVALimit =
-          this.$store.state.casedetail.content.Branch[e]["Single.MVA Limit"];
-        rtMVA = temp[this.anchor + 3 + idx * this.arrlength];
-
-        // Check if branch is a tieline
-        rowidx = this.tieLines
-          .map(function (el) {
-            return el[0];
-          })
+        var rowidx = this.tieLines
+          .map(function (el) { return el[0]; })
           .indexOf(e);
 
         if (rtMVA > branchMVALimit) {
-          // If overloaded branch is tieline
           if (rowidx != -1) {
             violatedBasins.push(+this.tieLines[rowidx][1]);
             violatedBasins.push(+this.tieLines[rowidx][2]);
-          }
-          // If overloaded branch is a non-tieline
-          else {
+          } else {
             rowidx = this.nonTieLines
-              .map(function (el) {
-                return el[0];
-              })
+              .map(function (el) { return el[0]; })
               .indexOf(e);
-
-            violatedBasins.push(+this.nonTieLines[rowidx][1]);
+            if (rowidx != -1) {
+              violatedBasins.push(+this.nonTieLines[rowidx][1]);
+            }
           }
         }
       }

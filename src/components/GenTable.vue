@@ -229,103 +229,14 @@ export default {
     };
   },
   methods: {
-    preProcess() {
-      let anchor = 0;
-      var arrlength;
-      var keyarr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyarr = Object.keys(this.$store.state.casedetail.content[ele]);
-        if (ele != "Gen") {
-          anchor += arrlength * keyarr.length;
-        } else {
-          break;
-        }
-      }
-      this.anchor = anchor;
-      this.genDataLength = arrlength;
-    },
-    initTable() {
-      let temp = [];
-      let subID;
-      console.log(this.$store.state.casedetail.content.Gen);
-      for (let i in this.$store.state.casedetail.content.Gen) {
-        subID = this.$store.state.casedetail.content.Bus[i]["Int.Sub Number"];
-        temp.push({
-          value: [
-            this.$store.state.casedetail.content.Substation[subID.toString()][
-              "Double.Latitude"
-            ],
-            this.$store.state.casedetail.content.Substation[subID.toString()][
-              "Double.Longitude"
-            ],
-          ],
-          key: i,
-          name: i,
-          Status: 1,
-          vStatus: true,
-          MWMax:
-            this.$store.state.casedetail.content.Gen[i]["Single.MW Max Limit"],
-          MWMin:
-            this.$store.state.casedetail.content.Gen[i]["Single.MW Min Limit"],
-          MW: 0,
-          Mvar: 0,
-          MWSetpoint: 0,
-          VpuSetpoint: 1,
-          id: this.$store.state.casedetail.content.Gen[i]["String.ID"],
-        });
-      }
-      this.gens = temp;
-      if (this.gens.length > 1) {
-        return Promise.resolve("Table initialized properly");
-      } else {
-        return Promise.reject("Error in initialization");
-      }
-    },
-    updateTable() {
-      // setInterval(() => {
-      try {
-        const temp = this.$store.state.parsedData;
-        for (let i in this.gens) {
-          this.gens[i].MW = temp[this.anchor + 6 + i * this.genDataLength]; // MW is the 6th in the gen data
-          this.gens[i].Mvar = temp[this.anchor + 7 + i * this.genDataLength];
-          this.gens[i].MWSetpoint =
-            temp[this.anchor + 9 + i * this.genDataLength];
-          this.gens[i].VpuSetpoint =
-            temp[this.anchor + 8 + i * this.genDataLength];
-          this.gens[i].Status = temp[this.anchor + 5 + i * this.genDataLength];
-          if (
-            this.$store.state.genAction["Gen"][this.gens[i].key] != undefined
-          ) {
-            if (
-              this.$store.state.currentTime >=
-              Math.max(this.$store.state.genAction["Gen"][this.gens[i].key]) + 3
-            ) {
-              this.gens[i].vStatus = this.gens[i].Status == 1 ? true : false;
-            }
-          } else {
-            this.gens[i].vStatus = this.gens[i].Status == 1 ? true : false;
-          }
-        }
-      } catch (e) {
-        console.log("The raw data are not ready");
-      }
-      // }, 500);
-    },
     savemws(item) {
       this.snack = true;
       this.snackColor = "success";
       this.snackText = "New Setpoint Saved";
       this.mws = Math.min(Math.max(this.mws, 0), item.MWMax);
-      const command = "Set Power " + this.mws + " MW";
-      this.$store.commit("setMessage", [
-        "Gen",
-        item.key + "," + item.id,
-        item.key + "#" + item.id,
-        command,
-      ]);
-      this.$store.commit("setPublish");
+      import("../services/api").then(({ deviceApi }) => {
+        deviceApi.setGenPower(item.key + "," + item.id, this.mws);
+      });
     },
     openmws(item) {
       this.mws = item.MWSetpoint;
@@ -336,44 +247,31 @@ export default {
       this.snackText = "Canceled";
     },
     savevps(item) {
-      const command = "Set Exciter_Setpoint " + this.vps + " pu";
-      this.$store.commit("setMessage", [
-        "Gen",
-        item.key + "," + item.id,
-        item.key + "#" + item.id,
-        command,
-      ]);
-      this.$store.commit("setPublish");
+      // TODO: Add voltage setpoint API when backend supports it
+      console.log("Set voltage setpoint:", this.vps, "for", item.key);
     },
     openvps(item) {
       this.vps = item.VpuSetpoint;
     },
     toggle(item) {
-      var command;
+      const key = item.key + "," + item.id;
       if (item.Status == 1) {
-        command = "OPEN";
+        import("../services/api").then(({ deviceApi }) => {
+          deviceApi.openGen(key);
+        });
       } else {
-        command = "CLOSE";
+        import("../services/api").then(({ deviceApi }) => {
+          deviceApi.closeGen(key);
+        });
       }
-      // console.log(item);
-      this.$store.commit("setMessage", [
-        "Gen",
-        item.key + "," + item.id,
-        item.key + "#" + item.id,
-        command,
-      ]);
-      this.$store.commit("recordAction", ["Gen", item.key]);
-      this.$store.commit("setPublish");
     },
     toggleAGC(item) {
       console.log(item);
-      // console.log(this.$store.state.genData)
     },
     toggleALL() {
       this.switch = !this.switch;
-      this.$store.commit("toggleALL", this.switch);
     },
-    getColorByValue(MW, MAX) {
+        getColorByValue(MW, MAX) {
       var temp = "transparent";
       if (MW > 0) {
         if (MW >= MAX) {
@@ -395,7 +293,8 @@ export default {
     // this.initTable().then(() => this.updateTable());
   },
   computed: {
-    ...mapState(["genData"]),
+    ...mapGetters(["getGenData"]),
+    genData() { return this.getGenData; },
     disable() {
       if (this.$store.state.status == "running") {
         return false;

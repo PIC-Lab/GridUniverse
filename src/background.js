@@ -5,8 +5,6 @@ import {
   createProtocol,
   /* installVueDevtools */
 } from 'vue-cli-plugin-electron-builder/lib'
-// const zmq = require("zeromq")
-import { decode } from "@msgpack/msgpack"
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -55,28 +53,22 @@ function createWindow() {
   })
 }
 
-// Prepare the Python process that will be running with the Node
-// var util = require("util");
-// util.log('Self-check: Logging is working properly');
+// Prepare the Python process (FastAPI server)
 let pyProc = null
 let pyPort = null
 
-const createPyProc = (ip, port, server_port) => {
-  // let script = path.join(__dirname, '../py', 'ds_client.py')  // for development only
-  let script = path.join(__dirname, '../pydist', 'ds_client')
-  // util.log(script);
-  // pyProc = require('child_process').spawn("C:/Users/test/anaconda3/python.exe", [script, ip, port]) // for development
-  pyProc = require('child_process').execFile(script, [ip, port, server_port])
+const createPyProc = (casePath, port, server_port) => {
+  let script = path.join(__dirname, '../py/server.py')
+  pyProc = require('child_process').spawn("python3", [script, "--case", casePath, "--port", server_port])
   pyProc.stdout.on('data', function (chunk) {
-    var textChunk = chunk.toString('utf8');// buffer to string
-    // util.log(textChunk);
+    console.log(chunk.toString('utf8'));
   });
 
   pyProc.stderr.on('data', function (data) {
     console.error(data.toString());
   });
   if (pyProc != null) {
-    console.log('child process success')
+    console.log('FastAPI server started')
   }
 }
 
@@ -87,16 +79,10 @@ const sleep = (milliseconds) => {
 
 
 const exitPyProc = () => {
-  const { exec } = require('child_process');
-  exec('taskkill /f /t /im ds_client.exe', (err, stdout, stderr) => {
-    if (err) {
-      console.log(err)
-      return;
-    }
-    console.log(`stdout: ${stdout}`);
-    console.log(`stderr: ${stderr}`);
-  });
-  pyProc = null
+  if (pyProc) {
+    pyProc.kill();
+    pyProc = null;
+  }
   pyPort = null
 }
 
@@ -144,11 +130,9 @@ app.on('ready', async () => {
 
 // // Register the channel that the IPCMain will be listening
 ipcMain.once('connect', (event, config) => {
-  const config_object = decode(config);
-  if (config_object.direct == true) {
-    createPyProc(config_object.ip, config_object.port, config_object.server_port);
-  }
-
+  const config_object = JSON.parse(config);
+  // Launch the FastAPI server with the case file and port
+  createPyProc(config_object.case_path, config_object.port, config_object.server_port || 8000);
 })
 
 

@@ -20,7 +20,6 @@
           show-select
           item-key="name"
         >
-          <!-- <v-data-table :headers="headers" :items="formatRiskBuses" v-model="selected" hide-default-footer select-all item-key="name"> -->
           <template slot="headerCell" slot-scope="props">
             <v-tooltip bottom>
               <span slot="activator">
@@ -53,9 +52,6 @@
                 ></v-checkbox>
               </td>
               <td class="text-xs-left">{{ props.item.name }}</td>
-              <!-- <td class="text-xs-right">
-								<v-chip label small :color="getColorByValue(props.item.Vpu)" text-color="white">{{ props.item.Vpu }}</v-chip>
-							</td> -->
               <td class="text-xs-right">{{ props.item.Max }}</td>
               <td class="text-xs-right">{{ props.item.Min }}</td>
             </tr>
@@ -72,26 +68,8 @@
   </v-card>
 </template>
 
-<style>
-/* table.v-table tbody td:first-child,
-table.v-table tbody td:not(:first-child),
-table.v-table tbody th:first-child,
-table.v-table tbody th:not(:first-child),
-table.v-table thead td:first-child,
-table.v-table thead td:not(:first-child),
-table.v-table thead th:first-child,
-table.v-table thead th:not(:first-child) {
-	padding: 0 10px;
-}
-.tablediv {
-	z-index: 0;
-	height: 300px;
-	width: 100%;
-} */
-</style>
-
 <script>
-import { mapState } from "vuex";
+import { mapGetters } from "vuex";
 
 export default {
   props: {
@@ -101,22 +79,11 @@ export default {
   data() {
     return {
       headers: [
-        {
-          text: "Bus",
-          align: "left",
-          // sortable: false,
-          value: "name",
-        },
+        { text: "Bus", align: "left", value: "name" },
         { text: "Vpu", value: "Vpu" },
         { text: "Max", value: "Max" },
         { text: "Min", value: "Min" },
       ],
-      buses: [],
-      formatRiskBuses: [],
-      anchor: 0,
-      dataLength: 0,
-      arrLength: 0,
-      violateBuses: [],
       selected: [],
       defaultRowItems: [
         10,
@@ -126,94 +93,31 @@ export default {
     };
   },
   computed: {
-    ...mapState(["riskBuses"]),
+    ...mapGetters(["getRiskBuses", "getCaseData"]),
+    riskBuses() {
+      const buses = this.getRiskBuses;
+      const caseBuses = this.getCaseData ? this.getCaseData.content.Bus : {};
+      return buses.map(b => ({
+        name: b.bus_key,
+        Vpu: b.vpu,
+        Max: caseBuses[b.bus_key] ? caseBuses[b.bus_key]["Single.Max Limit"] : 0,
+        Min: caseBuses[b.bus_key] ? caseBuses[b.bus_key]["Single.Min Limit"] : 0,
+      }));
+    },
   },
   methods: {
-    initMonitor() {
-      var arrlength;
-      var keyCaseArr;
-      var valueFieldArr;
-
-      for (let ele in this.$store.state.fieldstore) {
-        arrlength = this.$store.state.fieldstore[ele]["Field"].length;
-        keyCaseArr = Object.keys(this.$store.state.casedetail.content[ele]);
-        valueFieldArr = Object.values(this.$store.state.fieldstore[ele]);
-        if (ele != "Bus") {
-          this.anchor += arrlength * keyCaseArr.length;
-        } else {
-          this.dataLength = arrlength * keyCaseArr.length;
-          this.statusIndex = valueFieldArr.indexOf("Status");
-          this.mwfromIndex = valueFieldArr.indexOf("MWFrom");
-          this.arrLength = arrlength;
-          break;
-        }
-      }
-      this.statusArray = Array(keyCaseArr.length).fill(1);
-    },
-    onMonitor() {
-      const temp = this.$store.getters.rawData;
-      const busData = temp.slice(this.anchor, this.anchor + this.dataLength);
-      let i = 0;
-      var key;
-      for (let [key, val] of Object.entries(
-        this.$store.state.casedetail.content.Bus
-      )) {
-        if (
-          busData[i] <= val["Single.Max Limit"] ||
-          busData[i] >= val["Single.Min Limit"]
-        ) {
-          // this.highRiskLines[key] = val;
-          this.violateBuses[key] = {};
-          this.violateBuses[key]["name"] = key;
-          this.violateBuses[key]["Vpu"] = busData[i];
-          this.violateBuses[key]["Max"] = val["Single.Min Limit"];
-          this.violateBuses[key]["Min"] = val["Single.Max Limit"];
-          this.violateBuses[key]["SubID"] = val["Int.Sub Number"];
-          this.violateBuses[key]["value"] = [
-            this.$store.state.casedetail.content.Substation[
-              val["Int.Sub Number"].toString()
-            ]["Double.Longitude"],
-            this.$store.state.casedetail.content.Substation[
-              val["Int.Sub Number"].toString()
-            ]["Double.Latitude"],
-          ];
-        } else if (key in this.violateBuses) {
-          delete this.violateBuses[key];
-        }
-        i += this.arrLength;
-      }
-      this.formatRiskBuses = Object.values(this.violateBuses);
-    },
     getColorByValue(value) {
-      var temp;
-      if (value >= 1.1) {
-        temp = "red";
-      } else if (value < 0.9) {
-        temp = "blue";
-      }
-      return temp;
+      if (value >= 1.1) return "red";
+      if (value < 0.9) return "blue";
+      return undefined;
     },
-    toggleAll() {
-      if (this.selected.length) this.selected = [];
-      else this.selected = this.desserts.slice();
-    },
-  },
-  created() {
-    // this.initTable();
-  },
-  mounted() {
-    // this.initMonitor();
-    // setInterval(() => {
-    // 	this.onMonitor();
-    // }, 1000);
   },
   watch: {
-    selected: function (newval, oldval) {
-      // console.log(newval);
+    selected: function (newval) {
       this.$store.commit("updateVBuses", newval);
     },
-    data: function (newval, oldval) {
-      if (this.data.length > 0) {
+    data: function (newval) {
+      if (this.data && this.data.length > 0) {
         this.$store.commit("triggerAlarm", "Bus");
       } else {
         this.$store.commit("dismissAlarm", "Bus");
