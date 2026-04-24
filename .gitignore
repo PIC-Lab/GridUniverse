@@ -5,6 +5,9 @@ node_modules
 /dist_electron
 /py/__pycache__
 /py/.idea
+*.db
+*.db-shm
+*.db-wal
 
 # local env files
 .env.local
