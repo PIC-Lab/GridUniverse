@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+websockets
+ams
+andes>=1.9.3
