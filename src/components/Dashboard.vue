@@ -314,7 +314,9 @@
         <marquee></marquee>
       </div>
       <div class="page-wrapper" id="step2">
-        <component v-bind:is="page"></component>
+        <keep-alive>
+          <component v-bind:is="page"></component>
+        </keep-alive>
       </div>
 
       <!-- <router-view/> -->

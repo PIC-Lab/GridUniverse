@@ -9,10 +9,8 @@
       <v-spacer></v-spacer>
       <userInfo></userInfo>
     </v-layout>
-    <!-- <v-container grid-list-xs text-xs-center> -->
     <v-container grid-list-xl text-xs-center fluid>
       <v-layout row wrap>
-        <!-- mini statistic start -->
         <v-flex lg3 sm6 xs12>
           <mini-statistic
             :name="'GenMW'"
@@ -60,27 +58,11 @@
             content-bg="white"
             @clicked="restore"
           >
-            <!-- <v-flex d-flex xs8 style="height: auto;"> -->
-            <div slot="widget-content" id="main" class="chart">
-              <!-- <div class="legend">
-								<status-indicator></status-indicator>Substation &nbsp; <status-indicator active></status-indicator>Substation with generator  &nbsp; <status-indicator intermediary></status-indicator>Substation with shunt
-              </div>-->
-              <!-- <div id="main" class="chart"></div> -->
-            </div>
+            <div slot="widget-content" id="main" class="chart"></div>
           </m-widget>
         </v-flex>
         <v-flex lg4 sm4 xs12>
           <v-layout row wrap>
-            <!-- <v-flex lg12 sm12 xs12>
-							<chartStatistic id="TC" min="dataMin" max="dataMax" title="Total Cost" icon="attach_money" card-color="indigo" :chart-color="[color.indigo.lighten1]" :costData='(getTotalCost || 0).toFixed(2)' type="line"></chartStatistic>
-						</v-flex>
-						<v-flex lg12 sm12 xs12>
-							<v-widget title="Area Generation Overview" content-bg="white">
-								<div slot="widget-content">
-									<pie :areatotal="areaData ? areaData.gen_mw : 0"></pie>
-								</div>
-							</v-widget>
-            </v-flex>-->
             <v-flex xs12>
               <m-widget title="Load Forecast" content-bg="white">
                 <div slot="widget-content">
@@ -94,13 +76,6 @@
                 :tabledata="riskBranches"
               ></branchTable>
             </v-flex>
-            <!-- <v-flex xs12>
-							<m-widget title="Substation OneLine Diagram" content-bg="white">
-								<div slot="widget-content">
-									<highTopo></highTopo>
-								</div>
-							</m-widget>
-            </v-flex>-->
           </v-layout>
         </v-flex>
       </v-layout>
@@ -132,69 +107,38 @@
   height: 700px;
   width: 100%;
 }
-/* .legend {
-	z-index: 0;
-	height: 30px;
-	width: 100%;
-} */
-.cardiv {
-  height: 300px;
-  width: 100%;
-}
-.status-indicator {
-  --status-indicator-color: rgb(34, 47, 151);
-  --status-indicator-color-active: rgb(197, 62, 21);
-  --status-indicator-color-intermediary: rgb(119, 93, 86);
-}
 </style>
 
 <script>
-import { cloneDeep } from "lodash";
-import { mapGetters, mapState } from "vuex";
+import { mapGetters } from "vuex";
 import MWidget from "@/components/MWidget";
-import VWidget from "@/components/VWidget";
 import MiniStatistic from "@/components/MiniStat";
-import pie from "@/components/pie";
 import branchTable from "@/components/RiskBranchTable";
-import chartStatistic from "@/components/chartStatistic";
-import Material from "vuetify/es5/util/colors";
 import loadForecast from "@/components/loadForecast";
 import userInfo from "@/components/userInfo";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import * as echarts from "echarts/core";
-import { CanvasRenderer } from "echarts/renderers";
-import { LinesChart, EffectScatterChart, ScatterChart } from "echarts/charts";
-import { TooltipComponent } from "echarts/components";
-// import * as echarts from "echarts/dist/echarts.min.js";
-// import "../assets/echarts-extension-leaflet.min.js";
-import "../assets/echarts-extension-leaflet.esm.js";
-import darkTheme from "../assets/dark.js";
-echarts.registerTheme('dark', darkTheme);
 
-echarts.use([
-  CanvasRenderer,
-  LinesChart,
-  EffectScatterChart,
-  ScatterChart,
-  TooltipComponent,
-]);
+const VOLT_COLORS = {
+  500: "#e53935",
+  230: "#3949ab",
+  115: "#1565c0",
+ 13.8: "#7c4dff",
+};
 
-
-var chart = "";
-var map = "";
-var linedata = "";
-var echartsOptions = {};
+const SUB_COLORS = {
+  Gen: "#ff5722",
+  Shunt: "#8d6e63",
+  default: "#283593",
+};
 
 export default {
-  name: "TEST",
+  name: "puremap",
   data() {
     return {
-      color: Material,
       linedata: [],
       subdata: [],
       subdetail: [],
-      busdetail: [],
       subshowDialog: false,
       lineshowDialog: false,
       children: {},
@@ -202,662 +146,333 @@ export default {
       id: "",
       name: "",
       volt: "",
-      config: null,
-      commands: [],
-      anchor: 0,
-      dataLength: 0,
-      statusIndex: null,
-      mwfromIndex: null,
-      branchArrLength: null,
       statusArray: [],
-      mwfromArray: [],
       openLineData: [],
-      branchToOpenBranch: {},
       highRiskLines: {},
       formatRiskLines: [],
       mapCenter: [27.4241, -98.4936],
       Interval: null,
+      map: null,
+      subLayer: null,
+      lineLayer: null,
+      openLineLayer: null,
+      riskLineLayer: null,
+      otherSubLayer: null,
+      otherLineLayer: null,
     };
   },
   methods: {
-    initdraw(id) {
-      // map = L.map("main", {
-      //   // crs: L.CRS.EPSG4326,
-      //   center: this.mapCenter, //this.$store.state.center, //this.mapCenter,
-      //   maxZoom: 18,
-      //   zoom: 8,
-      // });
-      echartsOptions = {
-        leaflet: {
-          // leaflet options (only primitive options, crs/layers/renderer/maxBounds are not allowed here)
-          center: this.mapCenter,
-          zoom: 8,
-          maxZoom: 18,
-          // maxBoundsViscosity: 1.0,
-          // zoomAnimation: false,
-
-          // the following options are from this plugin
-          // whether the chart should always re-render when moving/zooming the map
-          renderOnMoving: true,
-          // whether to enable large mode (it's better to enable when data is large)
-          largeMode: false,
-        },
-        animation: false,
-        tooltip: {
-          show: true,
-          trigger: "item",
-        },
-        series: [
-          {
-            id: "sub",
-            type: "effectScatter",
-            name: "sub",
-            coordinateSystem: "leaflet",
-            // coordinateSystem: 'bmap',
-            symbol: "circle",
-            symbolSize: function (value, params) {
-              if (params.data.attributes.Gen) {
-                return 14;
-              } else if (params.data.attributes.Shunt) {
-                return 12;
-              } else {
-                return 10;
-              }
-            },
-            showEffectOn: "emphasis",
-            zlelve: 5,
-            z: 5,
-            // progressive: 40,
-            // progressiveThreshold: 200,
-            // zindex: 2,
-            data: [],
-            tooltip: {
-              confine: true,
-              formatter: function (params) {
-                return "Substation: " + params.name;
-              },
-            },
-            itemStyle: {
-              color: function (params) {
-                if (
-                  params.data.attributes.Gen &&
-                  params.data.attributes.Shunt
-                ) {
-                  console.log("wow you are lucky!");
-                  return {
-                    type: "radial",
-                    x: 0.5,
-                    y: 0.5,
-                    r: 0.5,
-                    colorStops: [
-                      {
-                        offset: 0,
-                        color: "#ff5722",
-                      },
-                      {
-                        offset: 1,
-                        color: "#8d6e63",
-                      },
-                    ],
-                    globalCoord: false,
-                  };
-                } else if (params.data.attributes.Gen) {
-                  return "#ff5722";
-                } else if (params.data.attributes.Shunt) {
-                  return "#8d6e63";
-                } else {
-                  return "#283593";
-                }
-              },
-            },
-          },
-          {
-            id: "lines",
-            name: "lines",
-            type: "lines",
-            coordinateSystem: "leaflet",
-            animation: false,
-            // progressive: 100,
-            // progressiveThreshold: 200,
-            symbol: ["none", "arrow"],
-            symbolSize: 10,
-            zlevel: 1,
-            // coordinateSystem: 'bmap',
-            silent: false,
-            // effect: {
-            // 	show: true,
-            // 	constantSpeed: 20,
-            // 	symbol: 'arrow',
-            // 	symbolSize: 7,
-            // 	trailWidth: 2,
-            // 	trailLength: 0,
-            // 	trailOpacity: 1,
-            // 	spotIntensity: 10
-            // },
-            label: {
-              show: true,
-              position: "middle",
-              // formatter: 'YES',
-              formatter: (params) => {
-                const limit = params.data.attributes.MVALimit;
-                const value = params.data.attributes.MVA;
-                const percentage = ((value * 100) / limit).toFixed(0);
-                var richText;
-                if (percentage >= 100) {
-                  richText = "{overload|" + percentage.toString() + "%}";
-                } else if (percentage >= 90) {
-                  if (map.getZoom() >= 10) {
-                    richText = "{zoomInDanger|" + percentage.toString() + "%}";
-                  } else {
-                    richText = "{indanger|" + percentage.toString() + "%}";
-                  }
-                } else {
-                  if (map.getZoom() >= 10) {
-                    richText = "{zoomInSafe|" + percentage.toString() + "%}";
-                  } else {
-                    richText = "{safe|" + percentage.toString() + "%}";
-                  }
-                }
-                return richText;
-              },
-              rich: {
-                overload: {
-                  fontSize: 18,
-                  color: "#ba000d",
-                },
-                indanger: {
-                  fontSize: 15,
-                  color: "#ffd600",
-                },
-                safe: {
-                  fontSize: 8,
-                  color: "#1b5e20",
-                },
-                zoomInSafe: {
-                  fontSize: 16,
-                  color: "#1b5e20",
-                },
-                zoomInDanger: {
-                  fontSize: 16,
-                  color: "#ffd600",
-                },
-              },
-            },
-            // blendMode: 'lighter',
-            // polyline: true,
-            lineStyle: {
-              width: 1,
-              // color: 'rgb(200, 40, 0)',
-              color: function (params) {
-                let temp;
-                // console.log(params.data.attributes.volt)
-                switch (params.data.attributes.volt) {
-                  case 230:
-                    temp = "#3949ab";
-                    break;
-                  case 500:
-                    temp = "#e53935";
-                    break;
-                  case 115:
-                    temp = "#1565c0";
-                    break;
-                  case 13.8:
-                    temp = "#7c4dff";
-                    break;
-                }
-                // console.log(params.data.attributes.volt);
-                return temp;
-              },
-              opacity: 1,
-            },
-            tooltip: {
-              // position: [10, 10],
-              confine: true,
-              formatter: function (params) {
-                return "Branch: " + params.name;
-              },
-            },
-            emphasis: {
-              lineStyle: {
-                width: 2,
-                shadowColor: "rgba(144, 144, 255, 0.5)",
-                shadowBlur: 10,
-              },
-            },
-            data: [],
-          },
-          {
-            id: "openLines",
-            name: "openLines",
-            type: "lines",
-            coordinateSystem: "leaflet",
-            zlevel: 1,
-            // coordinateSystem: 'bmap',
-            silent: false,
-            // blendMode: 'lighter',
-            // polyline: true,
-            lineStyle: {
-              width: 1,
-              color: "rgb(200, 40, 0)",
-              type: "dashed",
-              opacity: 1,
-            },
-            tooltip: {
-              formatter: function (params) {
-                return "Branch: " + params.name;
-              },
-            },
-            emphasis: {
-              lineStyle: {
-                width: 2,
-                shadowColor: "rgba(144, 144, 255, 0.5)",
-                shadowBlur: 10,
-              },
-            },
-            data: [],
-          },
-          {
-            id: "violatedLines",
-            name: "violatedLines",
-            type: "lines",
-            coordinateSystem: "leaflet",
-            silent: true,
-            zlevel: 2,
-            // symbol: 'pin',
-            // symbolSize: 30,
-            lineStyle: {
-              width: 10,
-              color: "#f44336",
-              // type: 'dotted',
-              shadowColor: "#ffcdd2",
-              shadowBlur: 20,
-              opacity: 0.5,
-            },
-            label: {
-              show: false,
-              position: "middle",
-              color: "black",
-              // fontWeight: 'bold',
-              formatter: function (params) {
-                return "Branch#" + params.name;
-              },
-            },
-            data: [],
-          },
-          {
-            id: "otherSub",
-            type: "scatter",
-            coordinateSystem: "leaflet",
-            silent: true,
-            large: true,
-            largeThreshold: 1,
-            blendMode: "lighter",
-            // progressive: 100,
-            // progressiveThreshold: 500,
-            symbolSize: 5,
-            zlelve: 2,
-            itemStyle: {
-              color: "#616161",
-            },
-            data: this.$store.state.otherArea.Substation,
-          },
-          {
-            id: "otherBranch",
-            type: "lines",
-            coordinateSystem: "leaflet",
-            silent: true,
-            large: true,
-            largeThreshold: 1,
-            zlelve: 2,
-            blendMode: "lighter",
-            // progressive: 100,
-            // progressiveThreshold: 500,
-            // zindex: 5,
-            lineStyle: {
-              color: "#757575",
-            },
-            data: this.$store.state.otherArea.Branch,
-          },
-        ],
-      };
-      // initialize echarts
-      chart = echarts.init(document.getElementById("main"));
-      chart.setOption(echartsOptions);
-      // get leaflet instance
-      var map = chart.getModel().getComponent("leaflet").getMap();
+    initMap() {
+      this.map = L.map("main", {
+        center: this.mapCenter,
+        maxZoom: 18,
+        zoom: 8,
+        preferCanvas: true,
+      });
       const url = "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png";
-      const options = {};
-      L.tileLayer(url, options).addTo(map);
-      var legend = L.control({ position: "topright" });
+      L.tileLayer(url).addTo(this.map);
+
+      this.subLayer = L.layerGroup().addTo(this.map);
+      this.lineLayer = L.layerGroup().addTo(this.map);
+      this.openLineLayer = L.layerGroup().addTo(this.map);
+      this.riskLineLayer = L.layerGroup().addTo(this.map);
+      this.otherSubLayer = L.layerGroup().addTo(this.map);
+      this.otherLineLayer = L.layerGroup().addTo(this.map);
+
+      const legend = L.control({ position: "topright" });
       legend.onAdd = function (map) {
-        var div = L.DomUtil.create("div", "legend legend-background");
-        let labels = ["<strong>Categories</strong>"];
-        const categories = [
-          "Substation",
-          "Substation w/ generator",
-          "Substation w/ shunt",
-        ];
-        const color = [
-          "rgb(34, 47, 151)",
-          "rgb(197, 62, 21)",
-          "rgb(119, 93, 86)",
-        ];
-        for (var i = 0; i < categories.length; i++) {
-          div.innerHTML +=
-            '<span class="circle" style="background:' +
-            color[i] +
-            '"></span>' +
-            categories[i] +
-            "<br>";
-        }
-        // div.innerHTML = labels.join('<br>');
-        // console.log(div)
+        const div = L.DomUtil.create("div", "");
+        div.style.cssText = "background:rgba(255,255,255,0.92);color:#212121;padding:10px 14px;font-size:13px;line-height:2;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);";
+        const dot = function (color) {
+          return '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + color + ';margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,0.15);"></span>';
+        };
+        const line = function (color, label) {
+          return '<span style="display:inline-block;width:18px;height:3px;background:' + color + ';margin-right:6px;vertical-align:middle;border-radius:2px;"></span>' + label;
+        };
+        div.innerHTML =
+          '<div style="font-weight:600;margin-bottom:4px;font-size:13px;">Substations</div>' +
+          '<div>' + dot(SUB_COLORS.default) + 'Substation</div>' +
+          '<div>' + dot(SUB_COLORS.Gen) + 'w/ Generator</div>' +
+          '<div>' + dot(SUB_COLORS.Shunt) + 'w/ Shunt</div>' +
+          '<div style="font-weight:600;margin-top:6px;margin-bottom:4px;">Voltage (kV)</div>' +
+          '<div>' + line(VOLT_COLORS[500], '500 kV') + '</div>' +
+          '<div>' + line(VOLT_COLORS[230], '230 kV') + '</div>' +
+          '<div>' + line(VOLT_COLORS[115], '115 kV') + '</div>' +
+          '<div>' + line(VOLT_COLORS[13.8], '13.8 kV') + '</div>';
         return div;
       };
-      legend.addTo(map);
-      // L.supermap.tiledMapLayer(url, option).addTo(map);
-
-      // var layerOptions = {
-      //   loadWhileAnimating: false,
-      //   attribution: "",
-      // };
-      // chart = L.supermap.echartsLayer(echartsOptions, layerOptions); // _ec is the echartsInstance
-      // console.log(chart);
-      // console.log(map);
-      // var EL = chart.addTo(map);
+      legend.addTo(this.map);
     },
+
+    drawSubstations() {
+      this.subLayer.clearLayers();
+      const self = this;
+      for (const sub of this.subdata) {
+        const attrs = sub.attributes || {};
+        let color = SUB_COLORS.default;
+        let radius = 5;
+        if (attrs.Gen) { color = SUB_COLORS.Gen; radius = 7; }
+        else if (attrs.Shunt) { color = SUB_COLORS.Shunt; radius = 6; }
+
+        const marker = L.circleMarker([sub.value[1], sub.value[0]], {
+          radius,
+          color,
+          fillOpacity: 0.9,
+          weight: 1,
+          opacity: 1,
+        }).addTo(this.subLayer);
+
+        marker.on("click", function () {
+          self.type = "Substation";
+          self.name = sub.name;
+          self.id = sub.id;
+          self.volt = "";
+          self.children = self.subdetail[+sub.id]
+            ? self.subdetail[+sub.id].Bus
+            : [];
+          self.subshowDialog = true;
+        });
+
+        marker.bindTooltip("Substation: " + sub.name);
+      }
+    },
+
+    drawLines() {
+      this.lineLayer.clearLayers();
+      const self = this;
+      for (const line of this.linedata) {
+        const volt = line.attributes ? line.attributes.volt : 0;
+        const color = VOLT_COLORS[volt] || "#757575";
+        const coords = line.coords.map(function(c) { return [c[1], c[0]]; });
+
+        const poly = L.polyline(coords, {
+          color,
+          weight: 1,
+          opacity: 1,
+        }).addTo(this.lineLayer);
+
+        poly.on("click", function () {
+          self.type = "Branch";
+          self.name = line.name;
+          self.id = line.id;
+          self.volt = (line.attributes ? line.attributes.volt : 0) + "kV";
+          self.lineshowDialog = true;
+        });
+
+        const limit = line.attributes ? line.attributes.MVALimit : 999;
+        const mva = line.attributes ? line.attributes.MVA : 0;
+        const pct = limit > 0 ? ((mva * 100) / limit).toFixed(0) : "0";
+        const tipColor = pct >= 100 ? "#ba000d" : pct >= 90 ? "#ffd600" : "#1b5e20";
+        poly.bindTooltip(
+          `<span style="color:${tipColor}">${line.name} — ${pct}%</span>`
+        );
+      }
+    },
+
+    drawOtherArea() {
+      this.otherSubLayer.clearLayers();
+      this.otherLineLayer.clearLayers();
+      const otherSubs = this.$store.state.otherArea.Substation;
+      const otherBranches = this.$store.state.otherArea.Branch;
+      for (const s of otherSubs) {
+        L.circleMarker([s.value[1], s.value[0]], {
+          radius: 3,
+          color: "#616161",
+          fillOpacity: 0.5,
+          weight: 0.5,
+        }).addTo(this.otherSubLayer);
+      }
+      for (const b of otherBranches) {
+        L.polyline(b.coords.map(function(c) { return [c[1], c[0]]; }), {
+          color: "#757575",
+          weight: 0.5,
+          opacity: 0.5,
+        }).addTo(this.otherLineLayer);
+      }
+    },
+
     getData() {
       this.subdata = this.$store.state.subData;
-      linedata = cloneDeep(this.$store.state.lineData);
+      this.linedata = this.$store.state.lineData;
       this.subdetail = this.$store.state.subDetail;
     },
-    onDrawSub() {
-      // let temp = echartsOptions;
-      // temp.series[0].data = this.subdata;
-      // temp.series[1].data = linedata;
-      // chart.setOption(temp);
-      // console.log(chart)
-      // console.log(this.subdata)
-      chart.setOption({
-        series: [
-          {
-            id: "sub",
-            data: this.subdata,
-          },
-          {
-            id: "lines",
-            data: linedata,
-          },
-        ],
-      });
-      var self = this;
-      // this.map.events.on({
-      // 	"click": function(params) {
-      // 		console.log(params);
-      // 	}
-      // })
-      chart.on("click", function (params) {
-        // console.log(params);
-        if (params.seriesName == "sub") {
-          self.type = "Substation";
-          self.name = params.name;
-          self.id = params.data.id;
-          self.volt = "";
-          self.children = self.subdetail[+params.data.id].Bus;
-          self.subshowDialog = true;
-        } else if (params.seriesName == "lines") {
-          self.type = "Branch";
-          self.name = params.name;
-          self.id = params.data.id;
-          self.volt = params.data.attributes.volt.toString() + "kV";
-          self.lineshowDialog = true;
-        } else if (params.seriesName == "openLines") {
-          self.type = "Branch";
-          self.name = params.name;
-          self.id = params.data.id;
-          self.volt = params.data.attributes.volt.toString() + "kV";
-          self.lineshowDialog = true;
-        }
-      });
-    },
-    onDrawLines() {
-      chart.setOption({
-        series: [
-          {
-            id: "lines",
-            data: linedata,
-          },
-        ],
-      });
-    },
+
     initUpdateLines() {
       const branches = this.$store.state.caseData ? this.$store.state.caseData.content.Branch : {};
       this.statusArray = Array(Object.keys(branches).length).fill(1);
     },
-    updateLinesCycle: function () {
+
+    updateLinesCycle() {
       this.Interval = setInterval(() => {
-        // this.updateLines();
         if (this.getStatus === "running") {
           this.updateLines();
         }
-        // console.log(this.$store.state.totalCost);
       }, 1500);
     },
+
     updateLines() {
       const simBranches = this.$store.state.simState ? this.$store.state.simState.branch : {};
-      let statusTemp = [];
-      let branchChanged = false;
-      var key;
-      let fromID, toID, coords;
-      for (let index in linedata) {
-        const live = simBranches[linedata[index].id] || {};
+      const statusTemp = [];
+      const self = this;
+      const caseData = this.$store.state.caseData;
+      if (!caseData) return;
+
+      const subs = caseData.content.Substation || {};
+      const buses = caseData.content.Bus || {};
+
+      for (let index in this.linedata) {
+        const live = simBranches[this.linedata[index].id] || {};
         const status = live.status != null ? live.status : 1;
         statusTemp.push(status);
-        linedata[index].attributes.MVA = live.mva_from || 0;
-        linedata[index].attributes.MVFrom = live.mvar_from || 0;
-        // branchIndex = i / this.branchArrLength;
-        fromID = linedata[index].id.split(",")[0];
-        toID = linedata[index].id.split(",")[1];
-        if (linedata[index].attributes.MVFrom > 0) {
-          // console.log(this.linedata[index].attributes.MVA)
-          linedata[index].coords = [
-            [
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[fromID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Latitude"],
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[fromID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Longitude"],
-            ],
-            [
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[toID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Latitude"],
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[toID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Longitude"],
-            ],
-          ];
-        } else if (linedata[index].attributes.MVFrom < 0) {
-          // console.log('NO')
-          linedata[index].coords = [
-            [
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[toID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Latitude"],
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[toID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Longitude"],
-            ],
-            [
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[fromID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Latitude"],
-              this.$store.state.caseData.content.Substation[
-                this.$store.state.caseData.content.Bus[fromID][
-                  "Int.Sub Number"
-                ].toString()
-              ]["Double.Longitude"],
-            ],
-          ];
+        this.linedata[index].attributes.MVA = live.mva_from || 0;
+        this.linedata[index].attributes.MVFrom = live.mvar_from || 0;
+
+        // Power flow direction — reverse coords if negative
+        if (this.linedata[index].attributes.MVFrom < 0) {
+          this.linedata[index].coords = [this.linedata[index].coords[1], this.linedata[index].coords[0]];
         }
-        // if ([0, 2, 3].includes(branchData[index * branchArrLength]))
-        // {
-        if (
-          this.statusArray[index] == 1 &&
-          [0, 2, 3].includes(status)
-        ) {
-          // Branch opened
+
+        // Open/close tracking
+        if (this.statusArray[index] == 1 && [0, 2, 3].includes(status)) {
           this.updateLineOpen(index);
-          branchChanged = true;
-        } else if (
-          [0, 2, 3].includes(this.statusArray[index]) &&
-          status == 1
-        ) {
-          // Branch closed
+        } else if ([0, 2, 3].includes(this.statusArray[index]) && status == 1) {
           this.updateLineClose(index);
-          branchChanged = true;
         }
-        key = linedata[index].id;
-        if (
-          (live.mva_from || 0) >=
-          0.85 * linedata[index].attributes.MVALimit
-        ) {
-          // this.highRiskLines[key] = val;
-          this.highRiskLines[key] = {};
-          this.highRiskLines[key]["name"] = key;
-          this.highRiskLines[key]["MVA"] =
-            branchData[index * branchArrLength + 3];
-          this.highRiskLines[key]["Ratio"] = (
-            (branchData[index * branchArrLength + 3] /
-              linedata[index].attributes.MVALimit) *
-            100
-          ).toFixed(2);
-          this.highRiskLines[key]["MVALimit"] =
-            linedata[index].attributes.MVALimit;
-          this.highRiskLines[key]["coords"] = linedata[index].coords;
+
+        // High-risk tracking
+        const key = this.linedata[index].id;
+        const mva = live.mva_from || 0;
+        const limit = this.linedata[index].attributes.MVALimit;
+        if (mva >= 0.85 * limit) {
+          this.highRiskLines[key] = {
+            name: key,
+            MVA: mva,
+            Ratio: ((mva * 100) / limit).toFixed(2),
+            MVALimit: limit,
+            coords: this.linedata[index].coords,
+          };
         } else if (key in this.highRiskLines) {
           delete this.highRiskLines[key];
         }
-        i += this.branchArrLength;
       }
-      this.formatRiskLines = Object.values(this.highRiskLines);
-      // let tempOption = chart._echartsOptions;
-      // tempOption.series[1].data = linedata;
-      // tempOption.series[2].data = this.openLineData;
-      let tempOption = {
-        series: [
-          { id: "lines", data: linedata },
-          { id: "openLines", data: this.openLineData },
-        ],
-      };
-      // console.log(tempOption)
-      chart.setOption(tempOption, {
-        silent: true,
-        lazyUpdate: true,
-      });
       this.statusArray = statusTemp;
-      // }
+      this.formatRiskLines = Object.values(this.highRiskLines);
+      this._refreshLineLayers();
     },
+
+    _refreshLineLayers() {
+      this.lineLayer.clearLayers();
+      this.openLineLayer.clearLayers();
+      this.riskLineLayer.clearLayers();
+
+      const self = this;
+      for (let index in this.linedata) {
+        const line = this.linedata[index];
+        const volt = line.attributes ? line.attributes.volt : 0;
+        const color = VOLT_COLORS[volt] || "#757575";
+        const coords = line.coords.map(function(c) { return [c[1], c[0]]; });
+        const mva = line.attributes ? line.attributes.MVA : 0;
+        const limit = line.attributes ? line.attributes.MVALimit : 999;
+        const pct = limit > 0 ? ((mva * 100) / limit).toFixed(0) : "0";
+
+        // Normal line
+        if (this.openLineData.findIndex(function(o) { return o.id === line.id; }) === -1) {
+          const tipColor = pct >= 100 ? "#ba000d" : pct >= 90 ? "#ffd600" : "#1b5e20";
+          L.polyline(coords, {
+            color, weight: 1, opacity: 1,
+          }).addTo(this.lineLayer).bindTooltip(
+            `<span style="color:${tipColor}">${line.name} — ${pct}%</span>`
+          );
+        }
+
+        // Open line (dashed red)
+        const openItem = this.openLineData.find(function(o) { return o.id === line.id; });
+        if (openItem) {
+          L.polyline([coords[0], coords[0]], {
+            color: "#c82800", weight: 1, dashArray: [5, 5], opacity: 1,
+          }).addTo(this.openLineLayer).bindTooltip(
+            `<span style="color:#c82800">${line.name} — OPEN</span>`
+          );
+        }
+
+        // High-risk line (thick red)
+        if (this.highRiskLines[line.id]) {
+          L.polyline(coords, {
+            color: "#f44336", weight: 6, opacity: 0.5,
+          }).addTo(this.riskLineLayer);
+        }
+      }
+    },
+
     updateLineOpen(branchIndex) {
-      const temp = cloneDeep(linedata[branchIndex]);
-      this.openLineData.push(temp);
-      linedata[branchIndex]["coords"] = [temp.coords[0], temp.coords[0]];
+      const line = this.linedata[branchIndex];
+      this.openLineData.push({ id: line.id, coords: [line.coords[0], line.coords[1]] });
+      this.linedata[branchIndex]["coords"] = [line.coords[0], line.coords[0]];
     },
+
     updateLineClose(branchIndex) {
       for (let i in this.openLineData) {
-        if (this.openLineData[i].id == linedata[branchIndex].id) {
-          linedata[branchIndex].coords = this.openLineData[i].coords;
+        if (this.openLineData[i].id == this.linedata[branchIndex].id) {
+          this.linedata[branchIndex].coords = this.openLineData[i].coords;
           this.openLineData.splice(i, 1);
           break;
         }
       }
     },
+
     restore() {
-      map.flyTo(this.mapCenter, 8, {
-        animate: true,
-        duration: 1.5,
-      });
+      this.map.flyTo(this.mapCenter, 8, { animate: true, duration: 1.5 });
     },
   },
-  created() {},
   mounted() {
     this.initUpdateLines();
-    this.initdraw("main");
-    this.updateLinesCycle();
-    if (this.$store.state.subData.length > 0) {
-      this.getData();
-      this.onDrawSub();
+    this.initMap();
+
+    const drawData = () => {
+      if (this.$store.state.subData.length > 0 && this.subdata.length === 0) {
+        this.getData();
+        this.drawSubstations();
+        this.drawLines();
+        this.drawOtherArea();
+      }
+    };
+
+    drawData();
+    this._unwatch = this.$store.watch(
+      (state) => state.subData.length,
+      () => drawData()
+    );
+    setTimeout(drawData, 500);
+    setTimeout(drawData, 2000);
+  },
+  activated() {
+    if (this.map) {
+      this.map.invalidateSize();
     }
-    // if (this.$store.state.showTour) {
-    //   var intro = introJs();
-    //   intro.setOptions({
-    //     showStepNumbers: false,
-    //     // overlayOpacity: 0.1,
-    //     steps: [
-    //       {
-    //         intro:
-    //           "Welcome to the final lab! For better performance, please use Chrome or Firefox."
-    //       }
-    //     ]
-    //   });
-    //   this.$store.commit("disableTour");
-    //   intro.start();
-    // }
+    this.updateLinesCycle();
+  },
+  deactivated() {
+    clearInterval(this.Interval);
   },
   beforeDestroy() {
     clearInterval(this.Interval);
-    try {
-      chart.remove();
-      map.remove();
-    } catch (err) {
-      console.log("The chart instance cannot be cleared");
-    }
+    if (this._unwatch) this._unwatch();
+    if (this.map) { this.map.remove(); this.map = null; }
   },
-  // watch: {
-  // 	highRiskLines: function() {
-  // 		console.log(this.highRiskLines);
-  // 	}
-  // },
   computed: {
-    ...mapGetters(["getAreaData", "getRiskBranches", "getSubData", "getLineData", "getBranchData", "getTransformerData"]),
+    ...mapGetters(["getAreaData", "getRiskBranches", "getStatus", "getSubData", "getLineData", "getBranchData", "getTransformerData"]),
     areaData() { return this.getAreaData; },
     riskBranches() { return this.getRiskBranches; },
   },
-  watch: {
-    '$store.state.subData.length'(newLen) {
-      if (newLen > 0 && this.subdata.length === 0) {
-        this.getData();
-        this.onDrawSub();
-      }
-    },
-  },
+  watch: {},
   components: {
     linepop: () => import("./linepop"),
     subpop: () => import("./subpop"),
-    VWidget,
     MWidget,
     MiniStatistic,
-    pie,
     branchTable,
-    chartStatistic,
     loadForecast,
     userInfo,
   },
 };
 </script>
-
