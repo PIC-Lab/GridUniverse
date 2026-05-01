@@ -11,6 +11,7 @@ GridUniverse (package name: gridverse) is a power grid simulation and visualizat
 ```bash
 npm install            # Install dependencies
 npm run serve          # Dev server (Vue CLI / webpack, default port 8080)
+                       # On Node.js v18+: use NODE_OPTIONS=--openssl-legacy-provider
 npm run build          # Production build (outputs to dist/)
 npm run build-report   # Production build with bundle analysis
 ```
@@ -34,7 +35,8 @@ No test framework is configured. No linter is configured.
 - **Vuex 3** for state management, **Vue Router 3** (history mode)
 - **WebSocket** (native) for real-time simulation state push from backend
 - **ky** HTTP client for REST API calls
-- **Leaflet** for GIS map visualization, **ECharts 5** for charts
+- **Leaflet** for GIS map visualization (pure Leaflet, no ECharts extension)
+- **ECharts 5** for charts (bar, pie, area strip — not for maps)
 - **FastAPI + uvicorn** Python backend with WebSocket support
 - **AMS** (Advanced Modeling System) for power flow simulation (extends ANDES)
 - **SQLite** for simulation history persistence
@@ -55,6 +57,15 @@ The Python backend (`py/server.py`) runs AMS power flow simulations and streams 
 - `py/case_exporter.py` — Exports static case dictionary from AMS System
 - `py/case_ACTIVSg2000.m` — MATPOWER test case (2000 buses, 8 areas)
 - `src/assets/2000.json` — Substation coordinates (real Texas lat/lng)
+
+### AMS Dependency
+
+AMS is a separate repository. Now it is already installed, if you don't find it, install it locally before running the backend:
+```bash
+pip install ams andes>=1.9.3
+```
+
+`server.py` also searches common local paths (`~/GitHub/ams`, `~/github/ams`) as fallback. Do not access the local AMS repo directory from this project — treat it as an external dependency.
 
 ### REST API Endpoints
 
@@ -96,17 +107,29 @@ GET  /api/history/actions?sim_id=X
 - **`src/views/`**: Route-level views — Home, Login, About, and feature views
 - **`src/components/`**: Reusable UI components organized by function:
   - Data tables: `GenTable`, `LoadTable`, `BranchTable`, `ShuntTable`, `TransformerTable` — use `deviceApi` for commands
-  - Visualizations: `puremap` (ECharts+Leaflet map), `IkMap`, `OneLine`, `barPlot`, `pie`, `graph`
-  - Dashboard widgets: `Dashboard`, `MWidget`, `MiniStat`, `AreaStrip`
+  - Maps: `puremap` (main interactive map), `OneLine` (dark-themed overview map) — both use pure Leaflet with `L.circleMarker`/`L.polyline`/`L.layerGroup`
+  - Charts: `barPlot`, `pie`, `AreaStrip`, `HourlyStrip`, `BusStrip` — use ECharts
+  - Dashboard widgets: `Dashboard`, `MWidget`, `MiniStat`
   - Status/monitoring: `Clock`, `AGCBot`, `marquee`
   - Popups/dialogs: `chatpop`, `linepop`, `subpop`, `reportpop`, `startpop`
 - **`src/App.vue`**: Root component (renders Login)
 - **`src/views/Login.vue`**: Login + dashboard loader (sets `showDash=true` to render Dashboard)
-- **`src/components/Dashboard.vue`**: Main dashboard with sidebar nav, renders page components dynamically via `<component v-bind:is="page">`
+- **`src/components/Dashboard.vue`**: Main dashboard with sidebar nav, renders pages via `<keep-alive><component :is="page"></component></keep-alive>`
+
+### Map Rendering (puremap.vue / OneLine.vue)
+
+Both map components use **pure Leaflet** (not ECharts). Key patterns:
+- `L.map()` with `preferCanvas: true` for performance with thousands of features
+- Separate `L.layerGroup` for each feature type (substations, lines, open lines, risk lines, other area)
+- Substations: `L.circleMarker` colored by type (Gen=#ff5722, Shunt=#8d6e63, default=#283593)
+- Lines: `L.polyline` colored by voltage (500=#e53935, 230=#3949ab, 115=#1565c0, 13.8=#7c4dff)
+- Simulation updates in `puremap`: open/close tracking, power flow direction, high-risk highlighting
+- Tooltips use template literals — never mix single/double quotes with HTML entities in tooltip strings
+- Data timing: `$store.watch` on `subData.length` + setTimeout fallbacks at 500ms/2000ms
 
 ### Routing
 
-No Vue Router for main navigation. Dashboard uses `store.state.page` + dynamic `<component :is="page">` to switch views (Home, generator, load, shunt, branch, etc.).
+No Vue Router for main navigation. Dashboard uses `store.state.page` + dynamic `<component :is="page">` to switch views (Home, generator, load, shunt, branch, etc.). Pages are cached with `<keep-alive>` — use `activated()`/`deactivated()` lifecycle hooks instead of `mounted()`/`beforeDestroy()` for cached components.
 
 ### Production Build
 

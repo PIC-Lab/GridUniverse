@@ -7,7 +7,9 @@ from pathlib import Path
 
 # Add AMS to path if installed locally
 _ams_candidates = [
+    Path.home() / "GitHub" / "ams",
     Path.home() / "github" / "ams",
+    Path(__file__).resolve().parent.parent.parent / "GitHub" / "ams",
     Path(__file__).resolve().parent.parent.parent / "github" / "ams",
 ]
 for _ams_path in _ams_candidates:
